@@ -352,7 +352,21 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    console.log(`  🚀 T&N Signal Server`);
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    console.log(`  Port:        ${PORT}`);
+    console.log(`  Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`  URL:         http://localhost:${PORT}`);
+    console.log(``);
+    console.log(`  External Services:`);
+    console.log(`  ├─ OpenAI (CHATGPT_API_KEY):  ${process.env.CHATGPT_API_KEY || process.env.OPENAI_API_KEY ? '✅ configured' : '❌ missing'}`);
+    console.log(`  ├─ GNews (GNEWS_API_KEY):     ${process.env.GNEWS_API_KEY ? '✅ configured' : '⚠️  missing (fallback: Yahoo Finance)'}`);
+    console.log(`  ├─ NewsAPI (NEWS_API_KEY):     ${process.env.NEWS_API_KEY ? '✅ configured' : '⚠️  missing (fallback: Yahoo Finance)'}`);
+    console.log(`  └─ Yahoo Finance:             ✅ built-in (no key needed)`);
+    console.log(``);
+    console.log(`  Model: ${process.env.OPENAI_MODEL || 'gpt-4o'}`);
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
   });
 }
 
