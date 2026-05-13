@@ -58,6 +58,8 @@ export default function App() {
   const [history, setHistory] = useState<string[]>([]);
   const [historyData, setHistoryData] = useState<Record<string, { report?: any; longFormContent?: string; prompt?: string }>>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+  const [zoomedWidget, setZoomedWidget] = useState<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tn-alpha-theme');
@@ -333,9 +335,15 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-             <Badge variant="outline" className="border-brand-green/30 text-brand-green bg-brand-green/10 px-3 py-1 font-mono text-[10px] uppercase tracking-wider">
-               α-LIVE CONNECTED
-             </Badge>
+             <Button
+               variant="ghost"
+               size="icon"
+               onClick={() => setShowGuide(true)}
+               className={theme === 'dark' ? 'text-white/60 hover:text-white hover:bg-white/5' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'}
+               title="User Guide"
+             >
+               <BookOpen className="h-4 w-4" />
+             </Button>
              <Button
                variant="ghost"
                size="icon"
@@ -358,20 +366,28 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
             >
-              <h1 className="text-6xl md:text-8xl font-black tracking-tighter mb-4 bg-gradient-to-b from-white via-white/80 to-white/40 bg-clip-text text-transparent italic">
-                T&N ALPHA.
+              <h1 className="text-6xl md:text-8xl font-black tracking-tighter mb-4 bg-gradient-to-b from-white via-white/80 to-white/40 bg-clip-text text-transparent italic pb-4">
+                T&N Signal.
               </h1>
-              <p className="text-brand-blue font-mono text-sm tracking-[0.3em] uppercase mb-12 opacity-80">Where insight becomes alpha.</p>
+              <p className="text-brand-blue font-mono text-xs tracking-[0.15em] mb-12 opacity-70">Finding the signal behind the market noise.</p>
               <div className="flex items-center justify-center gap-8 mb-10">
-                <div className="flex flex-col items-center gap-2">
-                  <img src="/founders/tomer.jpg" alt="Tomer" className="w-16 h-16 rounded-full border-3 border-brand-green/50 object-cover shadow-lg" />
+                <motion.div
+                  className="flex flex-col items-center gap-2 cursor-pointer"
+                  whileTap={{ scale: 1.2, rotate: 5 }}
+                  onClick={() => toast('💡 "Buy low, sell high. How hard can it be?" — Tomer', { duration: 3000 })}
+                >
+                  <img src="/founders/nadav.jpg" alt="Tomer" className="w-16 h-16 rounded-full border-3 border-brand-green/50 object-cover shadow-lg" />
                   <span className="text-sm text-zinc-400 font-semibold">Tomer</span>
-                </div>
+                </motion.div>
                 <span className="text-zinc-600 text-lg font-light">&</span>
-                <div className="flex flex-col items-center gap-2">
-                  <img src="/founders/nadav.jpg" alt="Nadav" className="w-16 h-16 rounded-full border-3 border-brand-blue/50 object-cover shadow-lg" />
+                <motion.div
+                  className="flex flex-col items-center gap-2 cursor-pointer"
+                  whileTap={{ scale: 1.2, rotate: -5 }}
+                  onClick={() => toast('📊 "The market can stay irrational longer than you can stay solvent." — Nadav', { duration: 3000 })}
+                >
+                  <img src="/founders/tomer.jpg" alt="Nadav" className="w-16 h-16 rounded-full border-3 border-brand-blue/50 object-cover shadow-lg" />
                   <span className="text-sm text-zinc-400 font-semibold">Nadav</span>
-                </div>
+                </motion.div>
               </div>
             </motion.div>
 
@@ -548,11 +564,12 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               
               {/* Main Summary - Bento Span */}
-              <Card className="lg:col-span-2 md:row-span-2 bg-zinc-950 border-zinc-900 overflow-hidden group">
+              <Card className="lg:col-span-2 md:row-span-2 bg-zinc-950 border-zinc-900 overflow-hidden group cursor-pointer hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Executive Thesis')}>
                 <CardHeader className="border-b border-zinc-900 bg-zinc-900/10">
                   <CardTitle className="text-sm font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
                     <FileText className="h-4 w-4 text-orange-500" /> Executive Thesis
                   </CardTitle>
+                  <p className="text-[10px] text-zinc-600 mt-1">AI-generated investment thesis summarizing the key bull/bear case and catalysts.</p>
                 </CardHeader>
                 <CardContent className="p-8">
                   <p className="text-xl md:text-2xl font-medium text-zinc-200 leading-relaxed mb-8 italic">
@@ -573,7 +590,10 @@ export default function App() {
               <Card className="lg:col-span-2 bg-zinc-950 border-zinc-900 overflow-hidden">
                 <CardContent className="p-0 h-[300px]">
                   <div className="p-6 border-b border-zinc-900 flex justify-between items-center">
-                    <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Price Performance (6M)</h3>
+                    <div>
+                      <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Price Performance (6M)</h3>
+                      <p className="text-[10px] text-zinc-600 mt-0.5">Daily closing price over the last 6 months from Yahoo Finance.</p>
+                    </div>
                     <TrendingUp className="h-4 w-4 text-zinc-600" />
                   </div>
                   <div className="h-[230px] w-full pt-4 pr-2">
@@ -607,9 +627,10 @@ export default function App() {
               </Card>
 
               {/* Sentiment Radar */}
-              <Card className="bg-zinc-950 border-zinc-900 flex flex-col">
+              <Card className="bg-zinc-950 border-zinc-900 flex flex-col cursor-pointer hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Market Sentiment')}>
                 <CardHeader className="p-6 pb-0">
                   <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Market Sentiment</CardTitle>
+                  <p className="text-[9px] text-zinc-700 mt-0.5">Radar chart showing news tone, social buzz, analyst consensus, technical signals, and AI confidence.</p>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col items-center justify-center p-0">
                   <div className="h-[180px] w-full relative">
@@ -634,9 +655,10 @@ export default function App() {
               </Card>
 
               {/* Risk Gauge */}
-              <Card className="bg-zinc-950 border-zinc-900 flex flex-col">
+              <Card className="bg-zinc-950 border-zinc-900 flex flex-col cursor-pointer hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Risk Profile')}>
                 <CardHeader className="p-6 pb-0">
                   <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Risk Profile</CardTitle>
+                  <p className="text-[9px] text-zinc-700 mt-0.5">Overall risk score (0–100) based on volatility, leverage, sector headwinds, and macro exposure.</p>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col items-center justify-center pt-4">
                   <div className="relative w-28 h-28 transform scale-110">
@@ -659,7 +681,7 @@ export default function App() {
               </Card>
               
               {/* Metrics Table - Bento Span */}
-              <Card className="lg:col-span-2 bg-zinc-950 border-zinc-900">
+              <Card className="lg:col-span-2 bg-zinc-950 border-zinc-900 cursor-pointer hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Metrics')}>
                 <CardContent className="p-6">
                   <div className="space-y-4">
                     {currentReport.metrics.map((m, i) => (
@@ -684,6 +706,7 @@ export default function App() {
                 <CardContent className="p-10 relative z-10 flex flex-col md:flex-row items-center gap-10">
                    <div className="text-center md:text-left space-y-2">
                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-blue">Final Verdict</p>
+                     <p className="text-[8px] text-white/40 max-w-[200px]">AI recommendation based on fundamentals, sentiment, and risk analysis. BUY/HOLD/SELL/WATCH.</p>
                      <h3 className={`text-8xl font-black italic transform -skew-x-6 ${
                         currentReport.recommendation === 'BUY' ? 'text-brand-green' : currentReport.recommendation === 'SELL' ? 'text-brand-coral' : 'text-brand-amber'
                      }`}>{currentReport.recommendation}</h3>
@@ -705,9 +728,10 @@ export default function App() {
 
             {/* SWOT & Catalysts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-               <Card className="bg-zinc-950 border-zinc-900">
+               <Card className="bg-zinc-950 border-zinc-900 cursor-pointer hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('SWOT Matrix')}>
                   <CardHeader>
                     <CardTitle className="text-sm font-bold uppercase tracking-widest text-zinc-500">SWOT Matrix</CardTitle>
+                    <p className="text-[10px] text-zinc-600 mt-0.5">Strengths, Weaknesses, Opportunities & Threats — key strategic factors affecting the investment.</p>
                   </CardHeader>
                   <CardContent className="grid grid-cols-2 gap-4 p-6 pt-0">
                     <div className="space-y-4">
@@ -724,9 +748,10 @@ export default function App() {
                     </div>
                   </CardContent>
                </Card>
-               <Card className="bg-zinc-950 border-zinc-900">
+               <Card className="bg-zinc-950 border-zinc-900 cursor-pointer hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Key Catalysts')}>
                   <CardHeader>
                     <CardTitle className="text-sm font-bold uppercase tracking-widest text-zinc-500">Key Catalysts</CardTitle>
+                    <p className="text-[10px] text-zinc-600 mt-0.5">Upcoming events or triggers that could move the stock price — earnings, product launches, regulatory decisions.</p>
                   </CardHeader>
                   <CardContent className="space-y-4 p-6 pt-0">
                     {currentReport.catalysts.map((c, i) => (
@@ -846,6 +871,173 @@ export default function App() {
           </motion.div>
         )}
       </main>
+
+      {/* User Guide Modal */}
+      <AnimatePresence>
+        {showGuide && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowGuide(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-3xl max-h-[85vh] overflow-y-auto m-4 p-8 shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-black text-white">📖 User Guide</h2>
+                <Button variant="ghost" size="sm" onClick={() => setShowGuide(false)} className="text-zinc-400 hover:text-white">✕</Button>
+              </div>
+              <div className="space-y-6 text-sm text-zinc-300">
+                <section>
+                  <h3 className="text-lg font-bold text-white mb-2">Getting Started</h3>
+                  <ol className="list-decimal pl-5 space-y-2">
+                    <li>Type a <strong>ticker</strong> (TSLA, NVDA, AGGU.L) or <strong>sector</strong> (EV Sector) in the search bar</li>
+                    <li>Optionally check <strong>Long-Form Research</strong> for a full institutional report</li>
+                    <li>Click <strong>GENERATE</strong> and wait for the AI analysis</li>
+                    <li>Review the dashboard — click any widget to zoom in</li>
+                  </ol>
+                </section>
+                <section>
+                  <h3 className="text-lg font-bold text-white mb-2">Dashboard Widgets</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { name: 'Executive Thesis', desc: 'AI-generated investment thesis with key bull/bear arguments' },
+                      { name: 'Price Performance', desc: '6-month daily closing price chart from Yahoo Finance' },
+                      { name: 'Market Sentiment', desc: 'Radar chart: news, social, analyst, technical, confidence scores' },
+                      { name: 'Risk Profile', desc: 'Risk score (0-100) from volatility, leverage, and macro factors' },
+                      { name: 'SWOT Matrix', desc: 'Strengths, Weaknesses, Opportunities, Threats analysis' },
+                      { name: 'Key Catalysts', desc: 'Upcoming events that could move the stock price' },
+                      { name: 'Final Verdict', desc: 'BUY/HOLD/SELL/WATCH with entry and exit price targets' },
+                    ].map(w => (
+                      <div key={w.name} className="bg-zinc-900/50 p-3 rounded-lg border border-zinc-800">
+                        <p className="font-semibold text-white text-xs">{w.name}</p>
+                        <p className="text-zinc-500 text-xs mt-0.5">{w.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                <section>
+                  <h3 className="text-lg font-bold text-white mb-2">Features</h3>
+                  <ul className="space-y-1.5">
+                    <li>📄 <strong>Export PDF</strong> — Download branded research report</li>
+                    <li>📋 <strong>Copy Prompt</strong> — Copy the AI prompt for reuse</li>
+                    <li>📚 <strong>Download for NotebookLM</strong> — Markdown export for Google NotebookLM</li>
+                    <li>🕐 <strong>History</strong> — Click sidebar items to reload cached reports instantly</li>
+                    <li>🌙 <strong>Dark/Light Mode</strong> — Toggle with sun/moon icon</li>
+                    <li>🔍 <strong>Click to Zoom</strong> — Click any widget to expand it full-screen</li>
+                  </ul>
+                </section>
+                <section>
+                  <h3 className="text-lg font-bold text-white mb-2">Tips</h3>
+                  <ul className="space-y-1.5 text-zinc-400">
+                    <li>• Use <strong>Long-Form</strong> for deep dives, <strong>Standard</strong> for quick screening</li>
+                    <li>• History saves full reports — reload without burning API credits</li>
+                    <li>• Type "Sector" or "Industry" in your query for macro-level analysis</li>
+                  </ul>
+                </section>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Zoomed Widget Modal */}
+      <AnimatePresence>
+        {zoomedWidget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+            onClick={() => setZoomedWidget(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4 p-8 shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-bold text-white">{zoomedWidget}</h2>
+                <Button variant="ghost" size="sm" onClick={() => setZoomedWidget(null)} className="text-zinc-400 hover:text-white">✕ Close</Button>
+              </div>
+              <div className="text-zinc-300 text-sm">
+                {zoomedWidget === 'Executive Thesis' && currentReport && (
+                  <div>
+                    <p className="text-xl italic mb-6">"{currentReport.summary}"</p>
+                    <div className="space-y-3">
+                      {currentReport.executiveSummary.points.map((p, i) => (
+                        <div key={i} className="flex gap-3 p-3 bg-zinc-900/50 rounded-lg">
+                          <CheckCircle2 className="h-4 w-4 text-brand-green mt-0.5 flex-shrink-0" />
+                          <span>{p}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {zoomedWidget === 'Market Sentiment' && currentReport && (
+                  <div className="text-center">
+                    <p className="text-6xl font-black text-brand-green mb-4">{currentReport.sentimentScore}%</p>
+                    <p className="text-zinc-500">Overall market sentiment score based on news, social media, analyst ratings, and technical indicators.</p>
+                    <div className="grid grid-cols-2 gap-4 mt-6">
+                      <div className="bg-zinc-900/50 p-4 rounded-lg"><span className="text-xs text-zinc-500">News Tone</span><p className="text-lg font-bold">{currentReport.sentimentScore}%</p></div>
+                      <div className="bg-zinc-900/50 p-4 rounded-lg"><span className="text-xs text-zinc-500">Confidence</span><p className="text-lg font-bold">{currentReport.confidence}%</p></div>
+                    </div>
+                  </div>
+                )}
+                {zoomedWidget === 'Risk Profile' && currentReport && (
+                  <div className="text-center">
+                    <p className="text-6xl font-black text-brand-coral mb-4">{currentReport.riskScore}/100</p>
+                    <p className="text-zinc-500 mb-6">Higher score = higher risk. Based on volatility, leverage, sector headwinds, and macro exposure.</p>
+                    <div className="bg-zinc-900/50 p-4 rounded-lg inline-block">
+                      <span className="text-xs text-zinc-500">Risk Level: </span>
+                      <span className={`font-bold ${currentReport.riskScore > 70 ? 'text-red-500' : currentReport.riskScore > 40 ? 'text-amber-500' : 'text-green-500'}`}>
+                        {currentReport.riskScore > 70 ? 'HIGH' : currentReport.riskScore > 40 ? 'MODERATE' : 'LOW'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {zoomedWidget === 'SWOT Matrix' && currentReport && (
+                  <div className="grid grid-cols-2 gap-6">
+                    <div><h4 className="text-green-500 font-bold text-xs uppercase mb-3">Strengths</h4>{currentReport.swot.strengths.map((s, i) => <p key={i} className="text-sm mb-2 pl-3 border-l-2 border-green-900">{s}</p>)}</div>
+                    <div><h4 className="text-red-500 font-bold text-xs uppercase mb-3">Weaknesses</h4>{currentReport.swot.weaknesses.map((s, i) => <p key={i} className="text-sm mb-2 pl-3 border-l-2 border-red-900">{s}</p>)}</div>
+                    <div><h4 className="text-blue-500 font-bold text-xs uppercase mb-3">Opportunities</h4>{currentReport.swot.opportunities.map((s, i) => <p key={i} className="text-sm mb-2 pl-3 border-l-2 border-blue-900">{s}</p>)}</div>
+                    <div><h4 className="text-amber-500 font-bold text-xs uppercase mb-3">Threats</h4>{currentReport.swot.threats.map((s, i) => <p key={i} className="text-sm mb-2 pl-3 border-l-2 border-amber-900">{s}</p>)}</div>
+                  </div>
+                )}
+                {zoomedWidget === 'Key Catalysts' && currentReport && (
+                  <div className="space-y-3">
+                    {currentReport.catalysts.map((c, i) => (
+                      <div key={i} className="flex gap-3 p-4 bg-zinc-900/50 rounded-lg">
+                        <Zap className="h-4 w-4 text-brand-green mt-0.5 flex-shrink-0" />
+                        <span>{c}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {zoomedWidget === 'Metrics' && currentReport && (
+                  <div className="space-y-3">
+                    {currentReport.metrics.map((m, i) => (
+                      <div key={i} className="flex justify-between items-center p-3 bg-zinc-900/50 rounded-lg">
+                        <span className="font-mono text-xs uppercase">{m.label}</span>
+                        <span className={`font-bold ${m.status === 'positive' ? 'text-brand-green' : m.status === 'negative' ? 'text-brand-coral' : 'text-zinc-300'}`}>{m.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

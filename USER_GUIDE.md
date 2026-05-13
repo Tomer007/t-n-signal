@@ -1,0 +1,126 @@
+# T&N Alpha — User Guide
+
+## What is T&N Alpha?
+
+T&N Alpha is an AI-powered equity research terminal that generates institutional-grade analysis for stocks and sectors. It combines real-time market data, news sentiment, and GPT-4o intelligence to produce actionable research reports.
+
+---
+
+## Getting Started
+
+### 1. Search for a Ticker or Sector
+
+Type a stock ticker (e.g., `TSLA`, `NVDA`, `AGGU.L`) or a sector name (e.g., `EV Sector`, `Semiconductors`) into the search bar and click **GENERATE**.
+
+You can also click any of the quick-access symbols below the search bar.
+
+### 2. Choose Report Mode
+
+- **Standard Mode** (default) — Generates a quick structured report with key metrics, SWOT, sentiment, and a BUY/HOLD/SELL recommendation.
+- **Long-Form Research** (checkbox) — Generates a full institutional-grade manuscript with 14 sections, suitable for portfolio managers and deep analysis.
+
+### 3. Wait for Results
+
+While generating, you'll see a progress indicator with a video. The AI processes market data, news, and fundamentals to build your report.
+
+### 4. Review Your Report
+
+Once complete, the dashboard shows:
+
+| Widget | What It Shows |
+|--------|---------------|
+| **Executive Thesis** | AI-generated investment thesis — the core bull/bear case |
+| **Price Performance (6M)** | Interactive chart of daily closing prices over 6 months |
+| **Market Sentiment** | Radar chart: news tone, social buzz, analyst consensus, technicals, confidence |
+| **Risk Profile** | Risk score (0–100) based on volatility, leverage, and macro exposure |
+| **Metrics Table** | Key financial metrics with positive/negative/neutral indicators |
+| **Final Verdict** | BUY / HOLD / SELL / WATCH recommendation with entry & exit price targets |
+| **SWOT Matrix** | Strengths, Weaknesses, Opportunities, Threats |
+| **Key Catalysts** | Upcoming events that could move the price |
+| **Used Prompt** | The exact AI prompt used — copyable for reproducibility |
+
+---
+
+## Features
+
+### Export Options
+
+- **Export PDF** — Downloads a branded PDF with the ticker, verdict, and summary
+- **Download for NotebookLM** — Downloads the long-form report as Markdown (upload to Google NotebookLM for interactive Q&A)
+- **Copy Prompt** — Copies the AI prompt to clipboard for reuse or modification
+
+### History (Sidebar)
+
+Click the chart icon (top-left) to open the History panel:
+- Shows your last 20 searches
+- Click any item to **load the cached report instantly** (no regeneration)
+- History persists across sessions (saved to `data/history/`)
+
+### Dark / Light Mode
+
+Click the sun/moon icon in the top-right navbar to toggle between dark and light themes. Your preference is saved automatically.
+
+### Cancel Generation
+
+While generating, the GENERATE button turns into a red **CANCEL** button. Click it to stop the analysis.
+
+---
+
+## Quick-Access Symbols
+
+The app comes pre-loaded with these symbols for one-click analysis:
+
+| Symbol | Description |
+|--------|-------------|
+| ZPRV.DE | SPDR MSCI Europe Small Cap Value Weighted |
+| HVE.L | Hydrogen One Capital Growth |
+| MLPA | Global X MLP ETF |
+| XRS2.DE | Xtrackers Russell 2000 |
+| IB01.L | iShares $ Treasury Bond 0-1yr |
+| EIMI.L | iShares Core MSCI EM IMI |
+| O | Realty Income Corporation |
+| LB | LandBridge Company |
+| BEPC | Brookfield Renewable Corporation |
+| CNQ | Canadian Natural Resources |
+| PFF | iShares Preferred & Income Securities |
+| KNG | FT Cboe Vest S&P 500 Dividend Aristocrats |
+| BOAT | SonicShares Global Shipping ETF |
+| AGGU.L | iShares Core Global Aggregate Bond |
+| RQI | Cohen & Steers Quality Income Realty |
+| PDI | PIMCO Dynamic Income Fund |
+| PDO | PIMCO Dynamic Income Opportunities |
+| ETG | Eaton Vance Tax-Advantaged Global Dividend |
+| MLPT | Global X MLP & Energy Infrastructure |
+| ZAUI | Zafgen Inc |
+| PTY | PIMCO Corporate & Income Opportunity |
+| URNU.L | Sprott Uranium Miners ETF |
+
+---
+
+## Tips
+
+1. **Use Long-Form for deep dives** — The 14-section report is ideal for due diligence on individual stocks.
+2. **Use Standard for quick screening** — Fast analysis to decide if a ticker is worth deeper research.
+3. **Check the prompt** — The "Used Prompt" section shows exactly what the AI was asked. Copy and modify it for custom analysis.
+4. **History is your library** — Every analysis is saved. Click history items to reload without burning API credits.
+5. **Sector analysis** — Type "EV Sector" or "Semiconductor Industry" for macro-level research across multiple companies.
+
+---
+
+## Technical Notes
+
+- **AI Model**: GPT-4o (configurable via `OPENAI_MODEL` in `.env`)
+- **Market Data**: Yahoo Finance (real-time quotes, 6-month history)
+- **News Sources**: GNews → NewsAPI → Yahoo Finance (cascading fallback)
+- **Reports saved to**: `data/reports/` (JSON files)
+- **History saved to**: `data/history/searches.json`
+
+---
+
+## Disclaimer
+
+T&N Alpha is an AI-driven research tool. All information is generated by large language models and third-party market data providers. This does not constitute financial advice. Always consult a professional advisor before allocating capital.
+
+---
+
+*Built by Tomer & Nadav*

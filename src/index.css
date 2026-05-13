@@ -232,6 +232,7 @@ html.light h1.bg-gradient-to-b {
   -webkit-background-clip: text !important;
   background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
+  padding-bottom: 0.25rem !important;
 }
 /* Sidebar text in light mode */
 html.light .text-brand-bone {

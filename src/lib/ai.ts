@@ -40,7 +40,7 @@ export function validateReport(data: unknown): AnalysisReport {
   return data as AnalysisReport;
 }
 
-const SYSTEM_PROMPT = `You are "T&N Alpha", a professional financial analyst AI. 
+const SYSTEM_PROMPT = `You are "T&N Signal", a professional financial analyst AI. 
 Your task is to provide deep, objective research based on provided market data and news. 
 Always include a disclaimer: "Not financial advice. For informational purposes only."`;
 
