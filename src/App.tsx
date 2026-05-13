@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { 
@@ -16,7 +16,9 @@ import {
   Sun,
   Moon,
   Info,
-  X
+  X,
+  Share2,
+  ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -46,6 +48,43 @@ import { generateShortReport, generateLongFormReport } from './lib/ai';
 import { AnalysisReport, MarketData } from './types';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
+/** Formats Graham analysis markdown into styled HTML */
+function formatGrahamMarkdown(md: string): string {
+  return md
+    // Tables — convert markdown tables to HTML
+    .replace(/^\|(.+)\|$/gm, (match) => {
+      const cells = match.split('|').filter(c => c.trim());
+      const isHeader = cells.every(c => /^[\s-:]+$/.test(c));
+      if (isHeader) return ''; // skip separator rows
+      const tag = 'td';
+      const cellsHtml = cells.map(c => `<${tag} class="px-3 py-2 border-b border-zinc-800/50 text-xs">${c.trim()}</${tag}>`).join('');
+      return `<tr class="hover:bg-zinc-900/30">${cellsHtml}</tr>`;
+    })
+    // Wrap consecutive <tr> in table
+    .replace(/((<tr[^>]*>.*?<\/tr>\s*)+)/g, '<div class="overflow-x-auto my-4"><table class="w-full border-collapse bg-zinc-900/20 rounded-lg overflow-hidden text-left">$1</table></div>')
+    // Headers
+    .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-black text-white mt-8 mb-3 pb-2 border-b border-zinc-800">$1</h1>')
+    .replace(/^## (.*$)/gm, '<h2 class="text-lg font-bold text-brand-green mt-6 mb-2">$1</h2>')
+    .replace(/^### (.*$)/gm, '<h3 class="text-sm font-semibold text-zinc-200 mt-4 mb-1 uppercase tracking-wide">$1</h3>')
+    // Bold & italic
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em class="text-zinc-400">$1</em>')
+    // Blockquotes
+    .replace(/^> (.*$)/gm, '<blockquote class="border-l-3 border-brand-green/60 bg-brand-green/5 pl-4 pr-3 py-2 text-zinc-300 my-3 rounded-r-lg text-sm">$1</blockquote>')
+    // Horizontal rules
+    .replace(/^---$/gm, '<hr class="border-zinc-800 my-6" />')
+    // Status emojis with color
+    .replace(/✅/g, '<span class="text-green-400 font-bold">✅</span>')
+    .replace(/❌/g, '<span class="text-red-400 font-bold">❌</span>')
+    .replace(/⚠️/g, '<span class="text-amber-400 font-bold">⚠️</span>')
+    .replace(/🟢/g, '<span class="text-green-400">🟢</span>')
+    .replace(/🟡/g, '<span class="text-amber-400">🟡</span>')
+    .replace(/🔴/g, '<span class="text-red-400">🔴</span>')
+    .replace(/⭐/g, '<span class="text-yellow-400">⭐</span>')
+    // Line breaks
+    .replace(/\n/g, '<br />');
+}
+
 /** Service status indicator for the Info modal — checks via /api/service-status endpoint */
 function ServiceStatus({ name, envKey, description, alwaysOn }: { name: string; envKey: string | null; description: string; alwaysOn?: boolean }) {
   const [status, setStatus] = useState<'checking' | 'ok' | 'missing'>('checking');
@@ -63,6 +102,10 @@ function ServiceStatus({ name, envKey, description, alwaysOn }: { name: string; 
         'CHATGPT_API_KEY': 'openai',
         'GNEWS_API_KEY': 'gnews',
         'NEWS_API_KEY': 'newsapi',
+        'FMP_API_KEY': 'fmp',
+        'FINNHUB_API_KEY': 'finnhub',
+        'FRED_API_KEY': 'fred',
+        'GEMINI_API_KEY': 'gemini',
       };
       const serviceKey = envKey ? keyMap[envKey] : null;
       setStatus(serviceKey && services[serviceKey] ? 'ok' : 'missing');
@@ -104,8 +147,17 @@ function ServiceStatus({ name, envKey, description, alwaysOn }: { name: string; 
 
 export default function App() {
   const APP_VERSION = '1.0.0';
+  const LOADING_VIDEOS = [
+    '/videos/13494091_2160_3840_25fps.mp4',
+    '/videos/13749818_1440_2560_50fps.mp4',
+    '/videos/15508753_2160_3840_60fps.mp4',
+    '/videos/3209242-uhd_3840_2160_25fps.mp4',
+    '/videos/YTDown_YouTube_Eliud-Kipchoge-the-greatest-marathon-run_Media_VkrebDIx9UQ_001_1080p.mp4',
+  ];
+  const [loadingVideo] = useState(() => LOADING_VIDEOS[Math.floor(Math.random() * LOADING_VIDEOS.length)]);
   const [query, setQuery] = useState('');
   const [showInfo, setShowInfo] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
   const [isLongForm, setIsLongForm] = useState(false);
   const [currentReport, setCurrentReport] = useState<AnalysisReport | null>(null);
   const [longFormContent, setLongFormContent] = useState<string>('');
@@ -119,6 +171,11 @@ export default function App() {
   const [showGuide, setShowGuide] = useState(false);
   const [zoomedWidget, setZoomedWidget] = useState<string | null>(null);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [grahamContent, setGrahamContent] = useState<string>('');
+  const [grahamLoading, setGrahamLoading] = useState(false);
+  const [apiLogs, setApiLogs] = useState<{ time: string; service: string; status: 'ok' | 'error'; message: string }[]>([]);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const terminalRef = useRef<HTMLDivElement>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tn-alpha-theme');
@@ -153,6 +210,12 @@ export default function App() {
 
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
+  const addApiLog = (service: string, status: 'ok' | 'error', message: string) => {
+    setApiLogs(prev => [{ time: new Date().toLocaleTimeString(), service, status, message }, ...prev].slice(0, 50));
+    // Auto-scroll terminal to top (newest entries)
+    setTimeout(() => terminalRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 100);
+  };
+
   const analyzeMutation = useMutation({
     mutationFn: async (targetQuery?: string) => {
       const activeQuery = (targetQuery || query).trim();
@@ -169,7 +232,9 @@ export default function App() {
       
       try {
         const marketRes = await axios.post('/api/market-data', { ticker: activeQuery.toUpperCase() }, { signal: controller.signal });
+        addApiLog('Yahoo Finance', 'ok', `Market data fetched for ${activeQuery.toUpperCase()}`);
         const newsRes = await axios.post('/api/news', { query: activeQuery }, { signal: controller.signal });
+        addApiLog('News API', 'ok', `${newsRes.data.news?.length || 0} articles fetched for "${activeQuery}"`);
         
         setMarketData(marketRes.data);
 
@@ -185,18 +250,21 @@ export default function App() {
             finalContent = update.content;
           }
           const { report: short, prompt: shortPrompt } = await generateShortReport(marketRes.data, newsRes.data.news, activeQuery);
+          addApiLog('OpenAI', 'ok', `Short report generated — ${currentReport?.recommendation || 'analysis complete'}`);
           setCurrentReport(short);
           return { short, long: finalContent };
         } else {
           setLongFormStep('Analyzing data with AI...');
           setLongFormProgress(50);
           const { report, prompt: usedPrompt } = await generateShortReport(marketRes.data, newsRes.data.news, activeQuery);
+          addApiLog('OpenAI', 'ok', `Report: ${report.recommendation} | Confidence: ${report.confidence}%`);
           setCurrentReport(report);
           setActivePrompt(usedPrompt);
           setLongFormProgress(100);
           return { short: report };
         }
       } catch (err: any) {
+        addApiLog('Error', 'error', err.response?.data?.error || err.message || 'Request failed');
         throw new Error(err.response?.data?.error || 'Failed to fetch analysis.');
       }
     },
@@ -233,9 +301,15 @@ export default function App() {
     }
   });
 
-  // Global keyboard shortcuts (Esc to close modals / cancel)
+  // Global keyboard shortcuts (Esc to close modals / cancel, ⌘K to focus search)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // ⌘K or Ctrl+K to focus search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
       if (e.key === 'Escape') {
         if (zoomedWidget) {
           setZoomedWidget(null);
@@ -340,6 +414,215 @@ export default function App() {
     toast.success('Markdown downloaded! You can now upload this to NotebookLM.');
   };
 
+  const runGrahamAnalysis = async () => {
+    if (!currentReport?.ticker) return;
+    setGrahamLoading(true);
+    setGrahamContent('');
+    const ticker = currentReport.ticker;
+
+    const grahamPrompt = `You are a value investing analyst applying Benjamin Graham's framework from "The Intelligent Investor" and "Security Analysis." Analyze the following stock against Graham's complete defensive investor criteria and provide a verdict using the EXACT output format specified below.
+
+**STOCK TO ANALYZE:** ${ticker}
+
+---
+
+## INSTRUCTIONS
+1. Fetch the most recent available financial data (latest annual report, current price, TTM where applicable).
+2. Use the current AAA corporate bond yield as the benchmark (state the rate and date).
+3. Show calculations explicitly where required.
+4. Follow the OUTPUT FORMAT below exactly — do not deviate from the structure.
+5. Use ✅ for PASS, ❌ for FAIL, ⚠️ for PARTIAL/UNKNOWN.
+
+---
+
+## REQUIRED OUTPUT FORMAT
+
+# 📊 Benjamin Graham Analysis: [COMPANY NAME] ([TICKER])
+
+## 🏢 Company Snapshot
+| Field | Value |
+|-------|-------|
+| Company Name | ? |
+| Ticker | ? |
+| Sector / Industry | ? |
+| Current Price | $? |
+| Market Cap | $? |
+| Currency | ? |
+| Data As Of | YYYY-MM-DD |
+| AAA Bond Yield (Benchmark) | ?% |
+
+---
+
+## 📋 FRAMEWORK 1 — The 7 Core Defensive Criteria
+
+| # | Criterion | Graham's Threshold | Actual Value | Result |
+|---|-----------|-------------------|--------------|--------|
+| 1 | S&P Quality Rating | B+ or better | ? | ✅/❌/⚠️ |
+| 2 | Debt ÷ Current Assets | < 1.10× | ? | ✅/❌/⚠️ |
+| 3 | Current Ratio | ≥ 1.5 (ideal 2.0+) | ? | ✅/❌/⚠️ |
+| 4 | 5-Yr EPS Growth (no deficits) | Positive | ? | ✅/❌/⚠️ |
+| 5 | P/E Ratio | ≤ 9 (max 15) | ? | ✅/❌/⚠️ |
+| 6 | Price-to-Book | ≤ 1.2× | ? | ✅/❌/⚠️ |
+| 7 | Pays Dividend | Yes | ? | ✅/❌/⚠️ |
+
+> **🎯 Core Score: X / 7**
+
+---
+
+## 🔬 FRAMEWORK 2 — The 10 Advanced Criteria
+
+### 💰 Reward Criteria (Is it cheap?)
+
+| # | Criterion | Threshold | Actual | Result |
+|---|-----------|-----------|--------|--------|
+| 1 | Earnings Yield ≥ 2× AAA Yield | ≥ ?% | ?% | ✅/❌/⚠️ |
+| 2 | P/E ≤ 40% of 5-Yr Highest P/E | ≤ ? | ? | ✅/❌/⚠️ |
+| 3 | Dividend Yield ≥ ⅔ AAA Yield | ≥ ?% | ?% | ✅/❌/⚠️ |
+| 4 | Price ≤ ⅔ Tangible Book/Share | ≤ $? | $? | ✅/❌/⚠️ |
+| 5 | Price ≤ ⅔ Net Current Asset Value | ≤ $? | $? | ✅/❌/⚠️ |
+
+### 🛡️ Risk Criteria (Is it safe?)
+
+| # | Criterion | Threshold | Actual | Result |
+|---|-----------|-----------|--------|--------|
+| 6 | Total Debt < Tangible Book Value | Yes | ? | ✅/❌/⚠️ |
+| 7 | Current Ratio ≥ 2.0 | ≥ 2.0 | ? | ✅/❌/⚠️ |
+| 8 | Total Debt ≤ 2× Net Quick Liquidation | ≤ 2× | ? | ✅/❌/⚠️ |
+| 9 | 10-Yr EPS Growth ≥ 7% CAGR | ≥ 7% | ?% | ✅/❌/⚠️ |
+| 10 | ≤ 2 EPS Declines of 5%+ in 10 Yrs | ≤ 2 | ? | ✅/❌/⚠️ |
+
+> **🎯 Advanced Score: X / 10** (Reward: X/5 | Risk: X/5)
+
+---
+
+## 🧮 FRAMEWORK 3 — Graham Number & Margin of Safety
+
+### Calculation
+Graham Number = √(22.5 × EPS × Book Value Per Share)
+
+### Valuation Summary
+| Metric | Value |
+|--------|-------|
+| EPS (TTM) | $? |
+| Book Value Per Share | $? |
+| **Graham Number (Fair Value Ceiling)** | **$?** |
+| Current Price | $? |
+| Discount / (Premium) to Graham Number | ?% |
+| Suggested Buy Price (33% MoS) | $? |
+
+### Margin of Safety Zone
+| Zone | Price Range | Status |
+|------|-------------|--------|
+| 🟢 BUY (≥33% MoS) | ≤ $? | ? |
+| 🟡 WATCH | $? – $? | ? |
+| 🔴 AVOID | > $? | ? |
+
+---
+
+## 🏆 FINAL VERDICT
+
+### Overall Rating
+> **⭐ [STRONG BUY / BUY / HOLD / AVOID]**
+
+### Scorecard Summary
+| Framework | Score | Grade |
+|-----------|-------|-------|
+| 7 Core Defensive Criteria | X / 7 | A/B/C/D/F |
+| 10 Advanced Criteria | X / 10 | A/B/C/D/F |
+| Margin of Safety (Graham Number) | ?% | A/B/C/D/F |
+| **Composite Graham Score** | **X / 17** | **?** |
+
+### ✅ Top 3 Strengths
+1. ?
+2. ?
+3. ?
+
+### ❌ Top 3 Weaknesses
+1. ?
+2. ?
+3. ?
+
+### 💵 Price Targets
+| Target | Price |
+|--------|-------|
+| Intrinsic Value (Graham Number) | $? |
+| Suggested Entry (33% MoS) | $? |
+| Current Price | $? |
+| Upside / (Downside) to Fair Value | ?% |
+
+### 🎓 Graham's Likely Opinion
+> *"[2–3 sentence assessment in the spirit of Benjamin Graham.]"*
+
+---
+*Analysis based on Benjamin Graham's "The Intelligent Investor" (Revised Edition).*`;
+
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: grahamPrompt, stream: true })
+      });
+
+      if (!response.ok) throw new Error(`Server returned ${response.status}`);
+      if (!response.body) throw new Error('No stream');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let content = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.replace('data: ', '').trim();
+            if (dataStr === '[DONE]') break;
+            try {
+              const dataObj = JSON.parse(dataStr);
+              content += dataObj.content;
+              setGrahamContent(content);
+            } catch {}
+          }
+        }
+      }
+      toast.success('Graham Analysis complete!');
+    } catch (err: any) {
+      toast.error(err.message || 'Graham analysis failed');
+    } finally {
+      setGrahamLoading(false);
+    }
+  };
+
+  const handleHebrewInfographic = async () => {
+    if (!currentReport) return;
+    toast.info('מייצר אינפוגרפיקה בעברית... (עד 15 שניות)');
+    try {
+      const res = await axios.post('/api/hebrew-infographic', {
+        report: currentReport,
+        ticker: currentReport.ticker,
+      }, { timeout: 70000 });
+      if (res.data?.html) {
+        const win = window.open('', '_blank');
+        if (win) {
+          win.document.write(res.data.html);
+          win.document.close();
+          toast.success('אינפוגרפיקה נוצרה בהצלחה!');
+        }
+      } else {
+        toast.error('Failed to generate infographic');
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.error || err.message;
+      if (err.response?.status === 429 || msg.includes('rate limit')) {
+        toast.error('Gemini rate limit — wait 30 seconds and try again');
+      } else {
+        toast.error(msg || 'Gemini API error');
+      }
+    }
+  };
+
   return (
     <div className={`min-h-screen font-sans selection:bg-orange-500/30 flex ${theme === 'dark' ? 'bg-[#050505] text-zinc-100' : 'bg-white text-zinc-900'}`}>
       <Toaster position="top-center" theme={theme} />
@@ -412,27 +695,13 @@ export default function App() {
               variant="ghost" 
               size="icon" 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              aria-label="Toggle research history sidebar"
               className={theme === 'dark' ? 'text-white/60 hover:text-white hover:bg-white/5' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'}
             >
               <BarChart3 className="h-5 w-5" />
             </Button>
             <div className={`hidden md:flex items-center gap-2 text-sm ${theme === 'dark' ? 'text-white/40' : 'text-zinc-400'}`}>
-              <span className="hover:text-white/80 cursor-pointer transition-colors" onClick={() => {
-                const resources = [
-                  { name: 'Yahoo Finance', url: 'https://finance.yahoo.com' },
-                  { name: 'TradingView', url: 'https://www.tradingview.com' },
-                  { name: 'Finviz Screener', url: 'https://finviz.com/screener.ashx' },
-                  { name: 'Seeking Alpha', url: 'https://seekingalpha.com' },
-                  { name: 'Macrotrends', url: 'https://www.macrotrends.net' },
-                  { name: 'SEC EDGAR', url: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany' },
-                  { name: 'FRED Economic Data', url: 'https://fred.stlouisfed.org' },
-                  { name: 'ETF.com', url: 'https://www.etf.com' },
-                ];
-                const win = window.open('', '_blank', 'width=400,height=500');
-                if (win) {
-                  win.document.write(`<html><head><title>T&N Signal — Resources</title><style>body{font-family:system-ui;padding:2rem;background:#0a0a0a;color:#e5e5e5}h2{margin-bottom:1rem;color:#1D9E75}a{display:block;padding:0.75rem 1rem;margin:0.5rem 0;border-radius:8px;background:#1a1a1a;color:#60a5fa;text-decoration:none;border:1px solid #333;transition:all 0.2s}a:hover{background:#222;border-color:#60a5fa}</style></head><body><h2>📡 Resources</h2>${resources.map(r => `<a href="${r.url}" target="_blank">${r.name}</a>`).join('')}</body></html>`);
-                }
-              }}>Terminal</span>
+              <span className={`cursor-pointer transition-colors ${theme === 'dark' ? 'hover:text-white/80' : 'hover:text-zinc-700'}`} onClick={() => setShowTerminal(!showTerminal)}>Terminal</span>
               <span className="opacity-20">/</span>
               <span className={`font-medium ${theme === 'dark' ? 'text-white/90' : 'text-zinc-900'}`}>Research</span>
             </div>
@@ -481,7 +750,7 @@ export default function App() {
               <h1 className="text-6xl md:text-8xl font-black tracking-tighter mb-4 bg-gradient-to-b from-white via-white/80 to-white/40 bg-clip-text text-transparent italic pb-4">
                 T&N Signal.
               </h1>
-              <p className="text-brand-blue font-mono text-xs tracking-[0.15em] mb-12 opacity-70">Finding the signal behind the market noise.</p>
+              <p className="text-brand-blue font-mono text-sm tracking-[0.12em] mb-12 opacity-80">Finding the signal behind the market noise.</p>
               <div className="flex items-center justify-center gap-8 mb-10">
                 <motion.div
                   className="flex flex-col items-center gap-2 cursor-pointer"
@@ -516,8 +785,9 @@ export default function App() {
                     <Search className="h-6 w-6 text-white/40" />
                   </div>
                   <Input 
+                    ref={searchInputRef}
                     className={`h-16 pl-3 pr-4 bg-transparent border-none focus:ring-0 text-xl font-medium ${theme === 'dark' ? 'placeholder:text-white/20 text-white' : 'placeholder:text-zinc-400 text-zinc-900'}`}
-                    placeholder="Ticker or sector..."
+                    placeholder={history.length > 0 ? `Last: ${history[0]} — or type new...` : "Ticker or sector..."}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && analyzeMutation.mutate(query)}
@@ -566,6 +836,9 @@ export default function App() {
                     Long-Form Research
                   </label>
                 </div>
+                <span className="hidden md:flex items-center gap-1.5 text-zinc-600 text-xs">
+                  <span className="kbd">⌘K</span> to focus
+                </span>
               </div>
             </motion.div>
 
@@ -604,17 +877,75 @@ export default function App() {
                 transition={{ type: 'spring', stiffness: 180, damping: 18, delay: 0.1 }}
                 className="w-full max-w-2xl mx-4"
               >
-                {/* Video */}
-                <div className="rounded-2xl overflow-hidden shadow-2xl mb-4">
+                {/* Founders Intro Animation */}
+                <motion.div
+                  initial={{ opacity: 1 }}
+                  animate={{ opacity: 0 }}
+                  transition={{ delay: 2.5, duration: 0.5 }}
+                  className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none"
+                >
+                  <div className="flex items-center gap-4">
+                    <motion.div
+                      initial={{ x: -100, rotate: -20, opacity: 0 }}
+                      animate={{ x: 0, rotate: 0, opacity: 1 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.2 }}
+                    >
+                      <motion.img
+                        src="/founders/nadav.jpg"
+                        alt="Tomer"
+                        className="w-20 h-20 rounded-full border-3 border-brand-green shadow-xl object-cover"
+                        animate={{ rotate: [0, -10, 10, -5, 0] }}
+                        transition={{ delay: 0.8, duration: 0.6 }}
+                      />
+                    </motion.div>
+                    <motion.div
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: [0, 1.4, 1], opacity: 1 }}
+                      transition={{ delay: 1.0, duration: 0.5, ease: 'easeOut' }}
+                      className="text-4xl"
+                    >
+                      🤝
+                    </motion.div>
+                    <motion.div
+                      initial={{ x: 100, rotate: 20, opacity: 0 }}
+                      animate={{ x: 0, rotate: 0, opacity: 1 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.2 }}
+                    >
+                      <motion.img
+                        src="/founders/tomer.jpg"
+                        alt="Nadav"
+                        className="w-20 h-20 rounded-full border-3 border-brand-blue shadow-xl object-cover"
+                        animate={{ rotate: [0, 10, -10, 5, 0] }}
+                        transition={{ delay: 0.8, duration: 0.6 }}
+                      />
+                    </motion.div>
+                  </div>
+                  <motion.p
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 1.4, duration: 0.4 }}
+                    className="absolute bottom-[35%] text-sm text-zinc-400 font-medium"
+                  >
+                    {['Crunching numbers... 🧮', 'Asking the market gods... 🔮', 'Reading tea leaves... 🍵', 'Consulting the oracle... 🏛️', 'Shaking the magic 8-ball... 🎱'][Math.floor(Math.random() * 5)]}
+                  </motion.p>
+                </motion.div>
+
+                {/* Video (fades in after founders) */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 2.5, duration: 0.5 }}
+                  className="rounded-2xl overflow-hidden shadow-2xl mb-4 max-h-[40vh]"
+                >
                   <video
                     autoPlay
                     muted
                     loop
                     playsInline
-                    className="w-full h-auto"
-                    src="/YTDown_YouTube_Eliud-Kipchoge-the-greatest-marathon-run_Media_VkrebDIx9UQ_001_1080p.mp4"
+                    className="w-full h-full object-cover max-h-[40vh]"
+                    src={loadingVideo}
                   />
-                </div>
+                </motion.div>
                 {/* Progress card */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
@@ -631,7 +962,7 @@ export default function App() {
                       </p>
                       <p className="text-xs text-zinc-500">Running the numbers...</p>
                     </div>
-                    <span className="text-xl font-black text-white">{Math.round(longFormProgress)}%</span>
+                    <span className="text-xl font-black text-white progress-glow">{Math.round(longFormProgress)}%</span>
                   </div>
                   <Progress value={longFormProgress} className="h-1.5 bg-zinc-900 [&>div]:bg-brand-green rounded-full" />
                 </motion.div>
@@ -667,6 +998,9 @@ export default function App() {
                 <Button variant="outline" size="sm" onClick={handleDownloadPDF} className="border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white">
                   <Download className="h-4 w-4 mr-2" /> EXPORT PDF
                 </Button>
+                <Button variant="outline" size="sm" onClick={handleHebrewInfographic} className="border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white">
+                  🇮🇱 אינפוגרפיקה
+                </Button>
                 {isLongForm && (
                   <Button size="sm" onClick={downloadMarkdown} className="bg-orange-600 hover:bg-orange-500 text-white font-bold">
                     <BookOpen className="h-4 w-4 mr-2" /> DOWNLOAD FOR NOTEBOOKLM
@@ -679,7 +1013,7 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               
               {/* Main Summary - Bento Span */}
-              <Card className="lg:col-span-2 md:row-span-2 bg-zinc-950 border-zinc-900 overflow-hidden group cursor-pointer hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Executive Thesis')}>
+              <Card className="lg:col-span-2 md:row-span-2 bg-zinc-950 border-zinc-900 overflow-hidden group cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Executive Thesis')}>
                 <CardHeader className="border-b border-zinc-900 bg-zinc-900/10">
                   <CardTitle className="text-sm font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
                     <FileText className="h-4 w-4 text-orange-500" /> Executive Thesis
@@ -742,7 +1076,7 @@ export default function App() {
               </Card>
 
               {/* Sentiment Radar */}
-              <Card className="bg-zinc-950 border-zinc-900 flex flex-col cursor-pointer hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Market Sentiment')}>
+              <Card className="bg-zinc-950 border-zinc-900 flex flex-col cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Market Sentiment')}>
                 <CardHeader className="p-6 pb-0">
                   <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Market Sentiment</CardTitle>
                   <p className="text-[9px] text-zinc-700 mt-0.5">Radar chart showing news tone, social buzz, analyst consensus, technical signals, and AI confidence.</p>
@@ -770,7 +1104,7 @@ export default function App() {
               </Card>
 
               {/* Risk Gauge */}
-              <Card className="bg-zinc-950 border-zinc-900 flex flex-col cursor-pointer hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Risk Profile')}>
+              <Card className="bg-zinc-950 border-zinc-900 flex flex-col cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Risk Profile')}>
                 <CardHeader className="p-6 pb-0">
                   <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Risk Profile</CardTitle>
                   <p className="text-[9px] text-zinc-700 mt-0.5">Overall risk score (0–100) based on volatility, leverage, sector headwinds, and macro exposure.</p>
@@ -780,7 +1114,9 @@ export default function App() {
                     <svg className="w-full h-full" viewBox="0 0 100 100">
                       <circle cx="50" cy="50" r="45" fill="none" stroke="#18181b" strokeWidth="10" />
                       <circle 
-                        cx="50" cy="50" r="45" fill="none" stroke="#ea580c" strokeWidth="10" 
+                        cx="50" cy="50" r="45" fill="none" 
+                        stroke={currentReport.riskScore > 70 ? '#DC2626' : currentReport.riskScore > 40 ? '#F59E0B' : '#1D9E75'} 
+                        strokeWidth="10" 
                         strokeDasharray={`${currentReport.riskScore * 2.82} 282`}
                         strokeLinecap="round"
                         transform="rotate(-90 50 50)"
@@ -796,7 +1132,7 @@ export default function App() {
               </Card>
               
               {/* Metrics Table - Bento Span */}
-              <Card className="lg:col-span-2 bg-zinc-950 border-zinc-900 cursor-pointer hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Metrics')}>
+              <Card className="lg:col-span-2 bg-zinc-950 border-zinc-900 cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Metrics')}>
                 <CardContent className="p-6">
                   <div className="space-y-4">
                     {currentReport.metrics.map((m, i) => (
@@ -843,29 +1179,41 @@ export default function App() {
 
             {/* SWOT & Catalysts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-               <Card className="bg-zinc-950 border-zinc-900 cursor-pointer hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('SWOT Matrix')}>
+               <Card className="bg-zinc-950 border-zinc-900 cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('SWOT Matrix')}>
                   <CardHeader>
-                    <CardTitle className="text-sm font-bold uppercase tracking-widest text-zinc-500">SWOT Matrix</CardTitle>
+                    <CardTitle className="text-sm font-bold uppercase tracking-widest text-zinc-500 section-accent">SWOT Matrix</CardTitle>
                     <p className="text-[10px] text-zinc-600 mt-0.5">Strengths, Weaknesses, Opportunities & Threats — key strategic factors affecting the investment.</p>
                   </CardHeader>
                   <CardContent className="grid grid-cols-2 gap-4 p-6 pt-0">
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <div className="text-[10px] font-bold text-green-500 uppercase tracking-widest mb-2">Strengths</div>
-                      {currentReport.swot.strengths.slice(0, 3).map((s, i) => (
-                        <p key={i} className="text-xs text-zinc-400 border-l border-green-900/50 pl-3">{s}</p>
+                      {currentReport.swot.strengths.slice(0, 2).map((s, i) => (
+                        <p key={i} className="text-xs text-zinc-400 border-l-2 border-green-900/50 pl-3">{s}</p>
                       ))}
                     </div>
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <div className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-2">Weaknesses</div>
-                      {currentReport.swot.weaknesses.slice(0, 3).map((s, i) => (
-                        <p key={i} className="text-xs text-zinc-400 border-l border-red-900/50 pl-3">{s}</p>
+                      {currentReport.swot.weaknesses.slice(0, 2).map((s, i) => (
+                        <p key={i} className="text-xs text-zinc-400 border-l-2 border-red-900/50 pl-3">{s}</p>
+                      ))}
+                    </div>
+                    <div className="space-y-3">
+                      <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">Opportunities</div>
+                      {currentReport.swot.opportunities.slice(0, 2).map((s, i) => (
+                        <p key={i} className="text-xs text-zinc-400 border-l-2 border-blue-900/50 pl-3">{s}</p>
+                      ))}
+                    </div>
+                    <div className="space-y-3">
+                      <div className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-2">Threats</div>
+                      {currentReport.swot.threats.slice(0, 2).map((s, i) => (
+                        <p key={i} className="text-xs text-zinc-400 border-l-2 border-amber-900/50 pl-3">{s}</p>
                       ))}
                     </div>
                   </CardContent>
                </Card>
-               <Card className="bg-zinc-950 border-zinc-900 cursor-pointer hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Key Catalysts')}>
+               <Card className="bg-zinc-950 border-zinc-900 cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Key Catalysts')}>
                   <CardHeader>
-                    <CardTitle className="text-sm font-bold uppercase tracking-widest text-zinc-500">Key Catalysts</CardTitle>
+                    <CardTitle className="text-sm font-bold uppercase tracking-widest text-zinc-500 section-accent">Key Catalysts</CardTitle>
                     <p className="text-[10px] text-zinc-600 mt-0.5">Upcoming events or triggers that could move the stock price — earnings, product launches, regulatory decisions.</p>
                   </CardHeader>
                   <CardContent className="space-y-4 p-6 pt-0">
@@ -878,6 +1226,83 @@ export default function App() {
                   </CardContent>
                </Card>
             </div>
+
+            {/* Benjamin Graham Value Analysis Widget */}
+            <Card className="bg-zinc-950 border-zinc-900 overflow-hidden hover:border-zinc-700 transition-colors">
+              <CardHeader className="border-b border-zinc-900 bg-gradient-to-r from-zinc-900/40 to-zinc-950 p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 bg-brand-green/10 border border-brand-green/20 rounded-xl flex items-center justify-center">
+                      <ShieldCheck className="h-5 w-5 text-brand-green" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                        Benjamin Graham Value Analysis
+                      </CardTitle>
+                      <p className="text-[11px] text-zinc-500 mt-0.5">7 Core + 10 Advanced Criteria • Graham Number • Margin of Safety</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {grahamContent && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setZoomedWidget('Graham Analysis')}
+                        className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs"
+                      >
+                        ⛶ Expand
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); runGrahamAnalysis(); }}
+                      disabled={grahamLoading}
+                      className="bg-brand-green hover:bg-brand-green/80 text-white font-bold px-5 shadow-lg shadow-brand-green/20"
+                    >
+                      {grahamLoading ? (
+                        <><Loader2 className="h-3.5 w-3.5 animate-spin mr-2" /> Analyzing...</>
+                      ) : grahamContent ? (
+                        <>↻ Re-run</>
+                      ) : (
+                        <>▶ Run Analysis</>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {!grahamContent && !grahamLoading && (
+                  <div className="text-center py-16 px-6">
+                    <div className="h-16 w-16 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                      <ShieldCheck className="h-8 w-8 text-zinc-600" />
+                    </div>
+                    <p className="text-sm text-zinc-400 mb-2">Evaluate <strong className="text-white">{currentReport.ticker}</strong> against Benjamin Graham's framework</p>
+                    <p className="text-xs text-zinc-600 max-w-md mx-auto">The Intelligent Investor's defensive criteria — financial strength, earnings stability, valuation discipline, and margin of safety.</p>
+                  </div>
+                )}
+                {(grahamContent || grahamLoading) && (
+                  <div className="relative">
+                    <div 
+                      className="graham-content text-[13px] text-zinc-300 leading-relaxed max-h-[500px] overflow-y-auto p-8 cursor-pointer"
+                      onClick={() => setZoomedWidget('Graham Analysis')}
+                      dangerouslySetInnerHTML={{ __html: formatGrahamMarkdown(grahamContent) }}
+                    />
+                    {grahamLoading && (
+                      <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-950 to-transparent pt-8 pb-4 px-8">
+                        <div className="flex items-center gap-2 text-xs text-brand-green font-medium">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Streaming Graham analysis...
+                        </div>
+                      </div>
+                    )}
+                    {!grahamLoading && grahamContent && (
+                      <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-950 to-transparent pt-8 pb-4 px-8 text-center">
+                        <span className="text-[10px] text-zinc-600 uppercase tracking-widest">Click to expand full report</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Used Prompt — Copyable */}
             {activePrompt && (
@@ -1105,16 +1530,34 @@ export default function App() {
                     <ServiceStatus name="OpenAI (GPT)" envKey="CHATGPT_API_KEY" description="AI analysis engine" />
                     <ServiceStatus name="GNews" envKey="GNEWS_API_KEY" description="Business news feed" />
                     <ServiceStatus name="NewsAPI" envKey="NEWS_API_KEY" description="Global news aggregator" />
+                    <ServiceStatus name="Financial Modeling Prep" envKey="FMP_API_KEY" description="Fundamentals & financials" />
+                    <ServiceStatus name="Finnhub" envKey="FINNHUB_API_KEY" description="Insider trades & sentiment" />
+                    <ServiceStatus name="FRED" envKey="FRED_API_KEY" description="Macro data & bond yields" />
+                    <ServiceStatus name="Gemini" envKey="GEMINI_API_KEY" description="Hebrew infographic generation" />
                     <ServiceStatus name="Yahoo Finance" envKey={null} description="Market data & quotes" alwaysOn />
                   </div>
                 </div>
 
-                {/* Tech Stack */}
+                {/* News Sources */}
                 <div>
-                  <h3 className="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-3">Stack</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {['React 19', 'Vite', 'Express', 'TypeScript', 'TailwindCSS', 'OpenAI', 'Yahoo Finance'].map(tech => (
-                      <span key={tech} className="text-xs px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-zinc-400">{tech}</span>
+                  <h3 className="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-3">News & Data Sources</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { name: 'Yahoo Finance', url: 'https://finance.yahoo.com' },
+                      { name: 'GNews.io', url: 'https://gnews.io' },
+                      { name: 'NewsAPI.org', url: 'https://newsapi.org' },
+                      { name: 'SEC EDGAR', url: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany' },
+                    ].map(s => (
+                      <a
+                        key={s.name}
+                        href={s.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-2.5 bg-zinc-900/30 border border-zinc-800/50 rounded-lg text-xs text-zinc-400 hover:text-white hover:border-zinc-600 transition-all"
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-brand-green/60" />
+                        {s.name}
+                      </a>
                     ))}
                   </div>
                 </div>
@@ -1126,6 +1569,67 @@ export default function App() {
                 </div>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Terminal — API Activity Log Modal */}
+      <AnimatePresence>
+        {showTerminal && (
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="fixed bottom-0 left-0 right-0 z-[200] bg-[#0a0a0a] border-t border-zinc-800 shadow-2xl terminal-glow"
+            style={{ height: '35vh' }}
+          >
+            {/* Terminal Header */}
+            <div className="flex items-center justify-between px-5 py-2.5 border-b border-zinc-800 bg-zinc-900/50">
+              <div className="flex items-center gap-3">
+                <div className="flex gap-1.5">
+                  <span className="h-3 w-3 rounded-full bg-red-500/80 cursor-pointer hover:bg-red-400" onClick={() => setShowTerminal(false)} />
+                  <span className="h-3 w-3 rounded-full bg-yellow-500/80" />
+                  <span className="h-3 w-3 rounded-full bg-green-500/80" />
+                </div>
+                <span className="text-xs font-mono text-zinc-500">t-n-signal — API Activity</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setApiLogs([])} className="text-zinc-500 hover:text-white text-[10px] h-6 px-2">
+                  Clear
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowTerminal(false)} className="text-zinc-500 hover:text-white text-[10px] h-6 px-2">
+                  ✕
+                </Button>
+              </div>
+            </div>
+            {/* Terminal Body */}
+            <div ref={terminalRef} className="p-4 overflow-y-auto h-[calc(35vh-44px)] font-mono text-[12px] leading-relaxed space-y-1">
+              <div className="text-brand-green mb-3">$ t-n-signal --api-log</div>
+              {apiLogs.length === 0 ? (
+                <div className="text-zinc-600 py-8 text-center">
+                  <p>No API activity yet.</p>
+                  <p className="mt-1 text-zinc-700">Run a search to see real-time 3rd party communication.</p>
+                </div>
+              ) : (
+                apiLogs.map((log, i) => (
+                  <div key={i} className="flex items-start gap-2 py-0.5">
+                    <span className="text-zinc-600 shrink-0">{log.time}</span>
+                    <span className={`shrink-0 ${log.status === 'ok' ? 'text-green-400' : 'text-red-400'}`}>
+                      {log.status === 'ok' ? '✓' : '✗'}
+                    </span>
+                    <span className={`shrink-0 font-bold ${
+                      log.service === 'OpenAI' ? 'text-purple-400' :
+                      log.service === 'Yahoo Finance' ? 'text-blue-400' :
+                      log.service === 'News API' ? 'text-cyan-400' :
+                      log.service === 'Error' ? 'text-red-400' : 'text-zinc-400'
+                    }`}>[{log.service}]</span>
+                    <span className="text-zinc-300">{log.message}</span>
+                  </div>
+                ))
+              )}
+              <div className="text-zinc-700 mt-2 animate-pulse">▊</div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1215,6 +1719,12 @@ export default function App() {
                       </div>
                     ))}
                   </div>
+                )}
+                {zoomedWidget === 'Graham Analysis' && grahamContent && (
+                  <div 
+                    className="graham-content text-[13px] text-zinc-300 leading-relaxed max-h-[75vh] overflow-y-auto"
+                    dangerouslySetInnerHTML={{ __html: formatGrahamMarkdown(grahamContent) }}
+                  />
                 )}
               </div>
             </motion.div>

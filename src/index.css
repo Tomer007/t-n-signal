@@ -276,3 +276,71 @@ html.light .text-white\/40 svg {
 html.light .select-none {
   color: #3f3f46 !important;
 }
+
+/* Widget hover micro-interactions */
+.widget-hover {
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.widget-hover:hover {
+  transform: scale(1.005);
+  box-shadow: 0 0 0 1px rgba(29, 158, 117, 0.15), 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Terminal new-log glow */
+.terminal-glow {
+  border-top: 1px solid transparent;
+  background-image: linear-gradient(#0a0a0a, #0a0a0a), linear-gradient(90deg, #1D9E75, #185FA5);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+/* Progress number glow pulse */
+@keyframes glow-pulse {
+  0%, 100% { text-shadow: 0 0 8px rgba(29, 158, 117, 0.3); }
+  50% { text-shadow: 0 0 20px rgba(29, 158, 117, 0.6); }
+}
+.progress-glow {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* Graham table styling */
+.graham-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.8rem;
+}
+.graham-content table tr:nth-child(even) {
+  background: rgba(39, 39, 42, 0.3);
+}
+.graham-content table td,
+.graham-content table th {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(63, 63, 70, 0.3);
+  text-align: left;
+}
+
+/* Section title left border accent */
+.section-accent {
+  border-left: 3px solid #1D9E75;
+  padding-left: 0.75rem;
+}
+
+/* Focus trap outline for modals */
+.modal-focus:focus-visible {
+  outline: 2px solid #1D9E75;
+  outline-offset: 2px;
+}
+
+/* Keyboard shortcut hint */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  background: rgba(63, 63, 70, 0.3);
+  border: 1px solid rgba(63, 63, 70, 0.5);
+  border-radius: 4px;
+  color: #71717a;
+}

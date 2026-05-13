@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: t-n-signal
+    runtime: node
+    region: oregon
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: NODE_ENV=production node --import tsx server.ts
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: CHATGPT_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o
+      - key: NEWS_API_KEY
+        sync: false
+      - key: GNEWS_API_KEY
+        sync: false
+      - key: REPORTS_DIR
+        value: ./data/reports
+    disk:
+      name: reports-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1

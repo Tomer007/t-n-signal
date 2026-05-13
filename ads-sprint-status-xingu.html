@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sprint Status — Xingu (May 6–20)</title>
+  <style>
+    :root { --navy: #042C53; --blue: #185FA5; --green: #1D9E75; --coral: #D85A30; --amber: #BA7517; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #FAFAF9; color: #1a1a1a; line-height: 1.7; padding: 2rem; }
+    .container { max-width: 960px; margin: 0 auto; }
+    .header { background: linear-gradient(135deg, var(--navy), var(--blue)); color: white; padding: 2.5rem; border-radius: 14px; margin-bottom: 2rem; }
+    .header h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.3rem; }
+    .header .meta { opacity: 0.8; font-size: 0.85rem; }
+    .header .sprint-bar { margin-top: 1.2rem; }
+    .header .sprint-bar .bar-bg { background: rgba(255,255,255,0.2); border-radius: 6px; height: 10px; overflow: hidden; }
+    .header .sprint-bar .bar-fill { background: var(--green); height: 100%; border-radius: 6px; transition: width 0.3s; }
+    .header .sprint-bar .bar-label { font-size: 0.75rem; opacity: 0.85; margin-top: 0.4rem; display: flex; justify-content: space-between; }
+    .section { margin-bottom: 2rem; }
+    .section-title { font-size: 1.15rem; font-weight: 700; color: var(--navy); margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 2px solid #e5e5e5; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+    .stat-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 1rem; text-align: center; }
+    .stat-card .number { font-size: 1.8rem; font-weight: 800; }
+    .stat-card .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: #666; margin-top: 0.2rem; }
+    .stat-card.done .number { color: var(--green); }
+    .stat-card.wip .number { color: var(--blue); }
+    .stat-card.blocked .number { color: #DC2626; }
+    .stat-card.notstarted .number { color: #999; }
+    .insight-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 0.75rem; }
+    .insight-card.warn { border-left: 4px solid var(--amber); }
+    .insight-card.danger { border-left: 4px solid #DC2626; }
+    .insight-card.info { border-left: 4px solid var(--blue); }
+    .insight-card.good { border-left: 4px solid var(--green); }
+    .insight-card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .insight-card.warn h3 { color: var(--amber); }
+    .insight-card.danger h3 { color: #DC2626; }
+    .insight-card.info h3 { color: var(--blue); }
+    .insight-card.good h3 { color: var(--green); }
+    .insight-card p { font-size: 0.85rem; color: #444; margin-bottom: 0.3rem; }
+    .workstream { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 0.75rem; }
+    .workstream h3 { font-size: 0.95rem; font-weight: 700; color: var(--navy); margin-bottom: 0.5rem; }
+    .workstream .progress-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.4rem; }
+    .workstream .progress-bar { flex: 1; background: #f0f0f0; border-radius: 6px; height: 8px; overflow: hidden; }
+    .workstream .progress-bar .fill { height: 100%; border-radius: 6px; }
+    .workstream .progress-bar .fill.green { background: var(--green); }
+    .workstream .progress-bar .fill.blue { background: var(--blue); }
+    .workstream .progress-bar .fill.amber { background: var(--amber); }
+    .workstream .progress-label { font-size: 0.75rem; color: #666; min-width: 60px; text-align: right; }
+    .workstream .items { font-size: 0.8rem; color: #555; margin-top: 0.4rem; }
+    table { width: 100%; border-collapse: collapse; background: white; font-size: 0.82rem; border-radius: 10px; overflow: hidden; border: 1px solid #e5e5e5; }
+    thead { background: var(--navy); color: white; }
+    th { padding: 0.7rem 0.8rem; text-align: left; font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    td { padding: 0.6rem 0.8rem; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    .ticket { display: inline-block; background: #EEF2FF; color: var(--blue); padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; font-family: monospace; }
+    .status-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+    .status-badge.done { background: #D1FAE5; color: #065F46; }
+    .status-badge.review { background: #DBEAFE; color: #1E40AF; }
+    .status-badge.wip { background: #FEF3C7; color: #92400E; }
+    .status-badge.blocked { background: #FEE2E2; color: #991B1B; }
+    .status-badge.notstarted { background: #F3F4F6; color: #6B7280; }
+    .action-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.6rem; display: flex; align-items: flex-start; gap: 0.75rem; }
+    .action-card .action-num { background: var(--navy); color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; flex-shrink: 0; margin-top: 0.1rem; }
+    .action-card .action-body h4 { font-size: 0.9rem; font-weight: 700; color: var(--navy); margin-bottom: 0.2rem; }
+    .action-card .action-body p { font-size: 0.82rem; color: #555; }
+    .action-card .action-body .who { font-size: 0.75rem; color: var(--blue); font-weight: 600; margin-top: 0.3rem; }
+    .defer-list { background: #FFF7ED; border: 1px solid #FED7AA; border-radius: 10px; padding: 1.25rem 1.5rem; margin-top: 1rem; }
+    .defer-list h3 { color: var(--amber); font-size: 0.95rem; margin-bottom: 0.5rem; }
+    .defer-list ul { padding-left: 1.2rem; font-size: 0.85rem; color: #555; }
+    .defer-list li { margin-bottom: 0.3rem; }
+    .footer { text-align: center; padding: 1.5rem; color: #999; font-size: 0.75rem; border-top: 1px solid #e5e5e5; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="header">
+      <h1>📊 Sprint Status — Xingu</h1>
+      <p class="meta">ADS Design System Team • May 6–20, 2026 • Day 6 of 11 working days • 5 days remaining</p>
+      <div class="sprint-bar">
+        <div class="bar-bg"><div class="bar-fill" style="width: 55%"></div></div>
+        <div class="bar-label"><span>May 6</span><span>55% elapsed</span><span>May 20</span></div>
+      </div>
+    </div>
+
+    <!-- Snapshot Stats -->
+    <div class="section">
+      <h2 class="section-title">Sprint Snapshot</h2>
+      <div class="stats-grid">
+        <div class="stat-card done"><div class="number">6</div><div class="label">Done / Testing Complete</div></div>
+        <div class="stat-card wip"><div class="number">2</div><div class="label">In Review</div></div>
+        <div class="stat-card wip"><div class="number">11</div><div class="label">Implementing</div></div>
+        <div class="stat-card notstarted"><div class="number">6</div><div class="label">Not Started</div></div>
+        <div class="stat-card blocked"><div class="number">1</div><div class="label">Blocked</div></div>
+      </div>
+      <p style="font-size: 0.85rem; color: #666; text-align: center;"><strong>26 total items</strong> — only 23% closed at the sprint midpoint (55% elapsed)</p>
+    </div>
+
+    <!-- Workstream Progress -->
+    <div class="section">
+      <h2 class="section-title">Workstream Progress</h2>
+
+      <div class="workstream">
+        <h3>🚀 Starfield Consumer App Launch <span style="font-weight:400; font-size:0.8rem; color:#666;">(ADS-7534)</span></h3>
+        <div class="progress-row">
+          <div class="progress-bar"><div class="fill amber" style="width: 35%"></div></div>
+          <span class="progress-label">~35% done</span>
+        </div>
+        <div class="items">10 items: 3 done/testing • 4 implementing • 1 blocked • 2 in review</div>
+      </div>
+
+      <div class="workstream">
+        <h3>⬆️ Angular 21 Upgrades <span style="font-weight:400; font-size:0.8rem; color:#666;">(CORE-8609)</span></h3>
+        <div class="progress-row">
+          <div class="progress-bar"><div class="fill blue" style="width: 50%"></div></div>
+          <span class="progress-label">~50% done</span>
+        </div>
+        <div class="items">5 items: 1 testing complete • 1 code review • 2 implementing • 1 bug (implementing)</div>
+      </div>
+
+      <div class="workstream">
+        <h3>🔧 KTLO / Design System Misc <span style="font-weight:400; font-size:0.8rem; color:#666;">(ADS-7966)</span></h3>
+        <div class="progress-row">
+          <div class="progress-bar"><div class="fill green" style="width: 15%"></div></div>
+          <span class="progress-label">~15% done</span>
+        </div>
+        <div class="items">5 items: 1 markup in progress • 2 ready for dev • 1 ready for markup • 1 functional review</div>
+      </div>
+    </div>
+
+    <!-- Flow Issues -->
+    <div class="section">
+      <h2 class="section-title">⚡ Flow Issues & Trends</h2>
+
+      <div class="insight-card danger">
+        <h3>High WIP per person — "busy but not finishing"</h3>
+        <p>Sergey carries 4 items (including a Blocker-priority story not started). Vakhtanh has 5 items across 3 different epics. This level of context-switching reduces throughput and increases cycle time.</p>
+      </div>
+
+      <div class="insight-card warn">
+        <h3>Blocked item with no resolution path</h3>
+        <p><span class="ticket">PEMSPA-1629</span> (My care team flow) — blocked, assigned to Alexandr. It's a Starfield dependency sitting without visible action. Carrying it distorts the team's sense of progress.</p>
+      </div>
+
+      <div class="insight-card warn">
+        <h3>Mid-sprint scope additions</h3>
+        <p>Two release stories (<span class="ticket">ADS-8264</span>, <span class="ticket">ADS-8263</span>) appear to have been added mid-sprint. They're assigned to Ivan who already has 2 active items. Adding work without removing something creates overcommitment.</p>
+      </div>
+
+      <div class="insight-card info">
+        <h3">"Testing Complete" items not closing</h3>
+        <p>4 items are in "Testing Complete" but not Closed — IVISPA-854, ITSPA-850, INTPAY-1101, PMSLSPA-178. Either there's a ceremony gap or QA handoff is slow. These represent finished work not being recognized.</p>
+      </div>
+
+      <div class="insight-card danger">
+        <h3>Critical bug gates the releases</h3>
+        <p><span class="ticket">ADS-8234</span> — infinite CD loop in <code>aw-select-search</code>. In code review now. If review cycles or the fix is incomplete, both pending releases (v4.2.67 and v5.0.20) cannot ship safely. This is the single highest-leverage item in the sprint.</p>
+      </div>
+    </div>
+
+    <!-- Quality & Scope Risks -->
+    <div class="section">
+      <h2 class="section-title">🎯 Quality & Scope Risks</h2>
+
+      <div class="insight-card danger">
+        <h3>BUL-9 — Blocker priority, Not Started</h3>
+        <p><code>getComponentFactoryResolver</code> proxy doesn't expose child component methods in cross-version mode. Marked Blocker but untouched. If other teams depend on this, the sprint is absorbing unmanaged risk.</p>
+      </div>
+
+      <div class="insight-card warn">
+        <h3>Accessibility debt rolling forward</h3>
+        <p><span class="ticket">ADS-7595</span> (WCAG text contrast) is still "Ready for Markup" — this has likely been carried across multiple sprints. Accessibility bugs compound when deferred.</p>
+      </div>
+
+      <div class="insight-card info">
+        <h3>No story points = no capacity signal</h3>
+        <p>None of the 26 items have story points. Without sizing, there's no way to objectively measure overcommitment or forecast completion. The team is flying blind on capacity.</p>
+      </div>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="section">
+      <h2 class="section-title">🎬 Recommended Adjustments (5 Days Remaining)</h2>
+
+      <div class="action-card">
+        <div class="action-num">1</div>
+        <div class="action-body">
+          <h4>Close the "almost done" items today</h4>
+          <p>IVISPA-854, ITSPA-850, INTPAY-1101, PMSLSPA-178 are all Testing Complete. Move them to Closed — this clears mental load and shows real throughput.</p>
+          <div class="who">→ Respective assignees + QA</div>
+        </div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-num">2</div>
+        <div class="action-body">
+          <h4>Land the critical CD loop fix</h4>
+          <p>Roman should focus exclusively on getting ADS-8234 through code review and merged. It gates both releases. Add a regression test before merge.</p>
+          <div class="who">→ Roman Masyahin + code reviewer</div>
+        </div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-num">3</div>
+        <div class="action-body">
+          <h4>Sequence Ivan's work: finish ADS-8003 → then releases</h4>
+          <p>The consumer page recheck must complete before releases ship anyway. Don't start release stories until the CD fix merges and ADS-8003 confirms no regressions.</p>
+          <div class="who">→ Ivan Shmyhal</div>
+        </div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-num">4</div>
+        <div class="action-body">
+          <h4>Resolve or remove the blocked item</h4>
+          <p>PEMSPA-1629 — if the blocker is external, move it out of the sprint and document the dependency. Don't carry dead weight.</p>
+          <div class="who">→ Alexandr Kirov + Scrum Master</div>
+        </div>
+      </div>
+
+      <div class="action-card">
+        <div class="action-num">5</div>
+        <div class="action-body">
+          <h4>Decide on BUL-9 now</h4>
+          <p>It's Blocker priority but Not Started. Either start it immediately or explicitly defer with stakeholder alignment. Ambiguity here is the worst outcome.</p>
+          <div class="who">→ Sergey Muhin + PO</div>
+        </div>
+      </div>
+
+      <div class="defer-list">
+        <h3>📤 Recommended to defer to next sprint</h3>
+        <ul>
+          <li><span class="ticket">ADS-8169</span> — Navigation panel icon layout (small screen) — Vakhtanh should finish Angular 21 upgrade instead</li>
+          <li><span class="ticket">ADS-7595</span> — WCAG text contrast — important but won't fit; schedule with dedicated focus next sprint</li>
+          <li><span class="ticket">ADS-7742</span> — Kibana report update — low urgency, no downstream dependency</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Process Improvement -->
+    <div class="section">
+      <h2 class="section-title">🔄 Process Fix for Next Sprint</h2>
+      <div class="insight-card good">
+        <h3>Set WIP limit: 2 active items per person</h3>
+        <p>The current spread (4–5 per person) creates a "busy but not finishing" pattern. Limiting WIP forces completion before starting new work, improving cycle time and predictability.</p>
+      </div>
+      <div class="insight-card good">
+        <h3>No mid-sprint additions without removal</h3>
+        <p>Release stories were added without removing anything. Establish a rule: every mid-sprint addition requires an explicit trade-off (something else moves out).</p>
+      </div>
+      <div class="insight-card good">
+        <h3>Size your work</h3>
+        <p>Without story points or t-shirt sizes, there's no capacity signal. Even rough sizing (S/M/L) would help the team avoid overcommitment and make trade-offs visible.</p>
+      </div>
+    </div>
+
+    <!-- Full Sprint Board -->
+    <div class="section">
+      <h2 class="section-title">📋 Full Sprint Board</h2>
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Summary</th><th>Status</th><th>Assignee</th><th>Parent Theme</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="ticket">ADS-8234</span></td><td>aw-select-search: UI freeze (infinite CD loop)</td><td><span class="status-badge review">Code Review</span></td><td>Roman Masyahin</td><td>—</td></tr>
+          <tr><td><span class="ticket">BUL-9</span></td><td>getComponentFactoryResolver proxy issue</td><td><span class="status-badge notstarted">Not Started</span></td><td>Sergey Muhin</td><td>ADS Components Q2</td></tr>
+          <tr><td><span class="ticket">ADS-8264</span></td><td>ADS 4.2.67 Release Story</td><td><span class="status-badge notstarted">Ready for Dev</span></td><td>Ivan Shmyhal</td><td>—</td></tr>
+          <tr><td><span class="ticket">ADS-8263</span></td><td>ADS 5.0.20 Release Story</td><td><span class="status-badge notstarted">Ready for Dev</span></td><td>Ivan Shmyhal</td><td>—</td></tr>
+          <tr><td><span class="ticket">PEMSPA-1629</span></td><td>My care team flow</td><td><span class="status-badge blocked">Blocked</span></td><td>Alexandr Kirov</td><td>Starfield Consumer</td></tr>
+          <tr><td><span class="ticket">ADS-8174</span></td><td>Consumer - Find Your Pharmacy</td><td><span class="status-badge wip">Implementing</span></td><td>Alexandr Kirov</td><td>Starfield Consumer</td></tr>
+          <tr><td><span class="ticket">ADS-8003</span></td><td>Recheck consumer pages after deploy</td><td><span class="status-badge wip">Implementing</span></td><td>Ivan Shmyhal</td><td>Starfield Consumer</td></tr>
+          <tr><td><span class="ticket">ADS-8236</span></td><td>Divider layout without stepper</td><td><span class="status-badge review">Functional Review</span></td><td>Ivan Shmyhal</td><td>Starfield Consumer</td></tr>
+          <tr><td><span class="ticket">CONSCHCON-1063</span></td><td>Review and confirm visit - wrong styles</td><td><span class="status-badge wip">Implementing</span></td><td>Vlad Ivchenko</td><td>Starfield Consumer</td></tr>
+          <tr><td><span class="ticket">ADS-8139</span></td><td>aw-input-password: NVDA reads entire list</td><td><span class="status-badge wip">Implementing</span></td><td>Vlad Ivchenko</td><td>ADS Components Q2</td></tr>
+          <tr><td><span class="ticket">VTAU-21</span></td><td>Angular 21 upgrade (VTAU)</td><td><span class="status-badge wip">Implementing</span></td><td>Roman Masyahin</td><td>Angular Upgrades</td></tr>
+          <tr><td><span class="ticket">CLASSSPA-147</span></td><td>Angular 21 upgrade (CLASSSPA)</td><td><span class="status-badge wip">Implementing</span></td><td>Vakhtanh Mkheidze</td><td>Angular Upgrades</td></tr>
+          <tr><td><span class="ticket">BENKBD-23</span></td><td>Bento Screen Keyboard → Angular 21</td><td><span class="status-badge wip">Implementing</span></td><td>Sergey Muhin</td><td>Angular Upgrades</td></tr>
+          <tr><td><span class="ticket">PMSLSPA-191</span></td><td>Broken elements after Angular upgrade</td><td><span class="status-badge wip">Implementing</span></td><td>Sergey Muhin</td><td>Angular Upgrades</td></tr>
+          <tr><td><span class="ticket">ADS-7883</span></td><td>Responsive dialog adjustments</td><td><span class="status-badge wip">Markup In Progress</span></td><td>Alina Sterleva</td><td>KTLO Design System</td></tr>
+          <tr><td><span class="ticket">ADS-7742</span></td><td>Kibana report update for 5.0.0+</td><td><span class="status-badge notstarted">Ready for Dev</span></td><td>Sergey Muhin</td><td>KTLO Design System</td></tr>
+          <tr><td><span class="ticket">ADS-8169</span></td><td>Navigation panel icon layout (small screen)</td><td><span class="status-badge notstarted">Ready for Dev</span></td><td>Vakhtanh Mkheidze</td><td>KTLO Design System</td></tr>
+          <tr><td><span class="ticket">ADS-7595</span></td><td>Navigation Mobile text contrast (WCAG)</td><td><span class="status-badge notstarted">Ready for Markup</span></td><td>Vakhtanh Mkheidze</td><td>KTLO Design System</td></tr>
+          <tr><td><span class="ticket">ADS-8194</span></td><td>Yukon Sprint Plan</td><td><span class="status-badge wip">Implementing</span></td><td>Kristina Zelenina</td><td>Manager Tasks</td></tr>
+          <tr><td><span class="ticket">ADS-8185</span></td><td>Xingu sprint ADS managers tasks</td><td><span class="status-badge wip">Implementing</span></td><td>Kristina Zelenina</td><td>Manager Tasks</td></tr>
+          <tr><td><span class="ticket">IVISPA-854</span></td><td>Consumer - Confirm contact information</td><td><span class="status-badge done">Testing Complete</span></td><td>Vakhtanh Mkheidze</td><td>Starfield Consumer</td></tr>
+          <tr><td><span class="ticket">ITSPA-850</span></td><td>Consumer - Reason for visit</td><td><span class="status-badge done">Testing Complete</span></td><td>Vlad Ivchenko</td><td>Starfield Consumer</td></tr>
+          <tr><td><span class="ticket">INTPAY-1101</span></td><td>Payment - wrong styles</td><td><span class="status-badge done">Testing Complete</span></td><td>Alexandr Kirov</td><td>Starfield Consumer</td></tr>
+          <tr><td><span class="ticket">PMSLSPA-178</span></td><td>Angular 21 upgrade (PMSLSPA)</td><td><span class="status-badge done">Testing Complete</span></td><td>Vakhtanh Mkheidze</td><td>Angular Upgrades</td></tr>
+          <tr><td><span class="ticket">ADS-8200</span></td><td>Weddell Sprint Report - Design System</td><td><span class="status-badge done">Closed</span></td><td>Alina Sterleva</td><td>Manager Tasks</td></tr>
+          <tr><td><span class="ticket">ADS-8186</span></td><td>Weddell Sprint Report - Raven Team</td><td><span class="status-badge done">Closed</span></td><td>Alina Sterleva</td><td>Manager Tasks</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer">
+      <p>Generated May 13, 2026 • Source: Jira Sprint 3626 (Xingu) • Team 246 — ADS Design System</p>
+    </div>
+
+  </div>
+</body>
+</html>
