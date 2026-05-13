@@ -14,7 +14,9 @@ import {
   Zap,
   BookOpen,
   Sun,
-  Moon
+  Moon,
+  Info,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -44,8 +46,66 @@ import { generateShortReport, generateLongFormReport } from './lib/ai';
 import { AnalysisReport, MarketData } from './types';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
+/** Service status indicator for the Info modal — checks via /api/service-status endpoint */
+function ServiceStatus({ name, envKey, description, alwaysOn }: { name: string; envKey: string | null; description: string; alwaysOn?: boolean }) {
+  const [status, setStatus] = useState<'checking' | 'ok' | 'missing'>('checking');
+
+  useEffect(() => {
+    if (alwaysOn) {
+      setStatus('ok');
+      return;
+    }
+    axios.get('/api/service-status').then(res => {
+      const services = res.data?.services;
+      if (!services) { setStatus('missing'); return; }
+      // Map envKey to service key
+      const keyMap: Record<string, string> = {
+        'CHATGPT_API_KEY': 'openai',
+        'GNEWS_API_KEY': 'gnews',
+        'NEWS_API_KEY': 'newsapi',
+      };
+      const serviceKey = envKey ? keyMap[envKey] : null;
+      setStatus(serviceKey && services[serviceKey] ? 'ok' : 'missing');
+    }).catch(() => setStatus('missing'));
+  }, [alwaysOn, envKey]);
+
+  return (
+    <div className="flex items-center justify-between p-3 bg-zinc-900/30 rounded-lg border border-zinc-800/50">
+      <div>
+        <p className="text-sm font-medium text-zinc-200">{name}</p>
+        <p className="text-[11px] text-zinc-500">{description}</p>
+      </div>
+      <div className="flex items-center gap-1.5">
+        {alwaysOn ? (
+          <span className="flex items-center gap-1 text-xs text-green-400 font-medium">
+            <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+            Built-in
+          </span>
+        ) : status === 'checking' ? (
+          <span className="flex items-center gap-1 text-xs text-zinc-500 font-medium">
+            <span className="h-2 w-2 rounded-full bg-zinc-500 animate-pulse" />
+            Checking...
+          </span>
+        ) : status === 'ok' ? (
+          <span className="flex items-center gap-1 text-xs text-green-400 font-medium">
+            <span className="h-2 w-2 rounded-full bg-green-400" />
+            Connected
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 text-xs text-amber-400 font-medium">
+            <span className="h-2 w-2 rounded-full bg-amber-400" />
+            Not configured
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const APP_VERSION = '1.0.0';
   const [query, setQuery] = useState('');
+  const [showInfo, setShowInfo] = useState(false);
   const [isLongForm, setIsLongForm] = useState(false);
   const [currentReport, setCurrentReport] = useState<AnalysisReport | null>(null);
   const [longFormContent, setLongFormContent] = useState<string>('');
@@ -179,6 +239,8 @@ export default function App() {
       if (e.key === 'Escape') {
         if (zoomedWidget) {
           setZoomedWidget(null);
+        } else if (showInfo) {
+          setShowInfo(false);
         } else if (showGuide) {
           setShowGuide(false);
         } else if (analyzeMutation.isPending && abortController) {
@@ -193,7 +255,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [zoomedWidget, showGuide, analyzeMutation.isPending, abortController]);
+  }, [zoomedWidget, showGuide, showInfo, analyzeMutation.isPending, abortController]);
 
   const handleDownloadPDF = async () => {
     if (!currentReport) return;
@@ -376,6 +438,15 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+             <Button
+               variant="ghost"
+               size="icon"
+               onClick={() => setShowInfo(true)}
+               className={theme === 'dark' ? 'text-white/60 hover:text-white hover:bg-white/5' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'}
+               title="App Info & Version"
+             >
+               <Info className="h-4 w-4" />
+             </Button>
              <Button
                variant="ghost"
                size="icon"
@@ -985,6 +1056,74 @@ export default function App() {
                     <li>• Type "Sector" or "Industry" in your query for macro-level analysis</li>
                   </ul>
                 </section>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* App Info Modal */}
+      <AnimatePresence>
+        {showInfo && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowInfo(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-md m-4 p-8 shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-black text-white flex items-center gap-2">
+                  <div className="h-8 w-8 bg-brand-green rounded-lg flex items-center justify-center">
+                    <Zap className="h-5 w-5 text-white" />
+                  </div>
+                  T&N Signal
+                </h2>
+                <Button variant="ghost" size="sm" onClick={() => setShowInfo(false)} className="text-zinc-400 hover:text-white">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="space-y-5">
+                {/* Version */}
+                <div className="flex items-center justify-between p-3 bg-zinc-900/50 rounded-lg border border-zinc-800">
+                  <span className="text-sm text-zinc-400">Version</span>
+                  <span className="text-sm font-mono font-bold text-white">{APP_VERSION}</span>
+                </div>
+
+                {/* External Services */}
+                <div>
+                  <h3 className="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-3">Connected Services</h3>
+                  <div className="space-y-2">
+                    <ServiceStatus name="OpenAI (GPT)" envKey="CHATGPT_API_KEY" description="AI analysis engine" />
+                    <ServiceStatus name="GNews" envKey="GNEWS_API_KEY" description="Business news feed" />
+                    <ServiceStatus name="NewsAPI" envKey="NEWS_API_KEY" description="Global news aggregator" />
+                    <ServiceStatus name="Yahoo Finance" envKey={null} description="Market data & quotes" alwaysOn />
+                  </div>
+                </div>
+
+                {/* Tech Stack */}
+                <div>
+                  <h3 className="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-3">Stack</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {['React 19', 'Vite', 'Express', 'TypeScript', 'TailwindCSS', 'OpenAI', 'Yahoo Finance'].map(tech => (
+                      <span key={tech} className="text-xs px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-zinc-400">{tech}</span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="pt-4 border-t border-zinc-800 text-center">
+                  <p className="text-xs text-zinc-500">Built by Tomer & Nadav</p>
+                  <p className="text-[10px] text-zinc-600 mt-1">Finding the signal behind the market noise.</p>
+                </div>
               </div>
             </motion.div>
           </motion.div>

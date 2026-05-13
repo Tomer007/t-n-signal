@@ -67,6 +67,19 @@ async function startServer() {
     res.json({ status: 'ok' });
   });
 
+  app.get('/api/service-status', (req, res) => {
+    res.json({
+      version: '1.0.0',
+      services: {
+        openai: !!(process.env.CHATGPT_API_KEY || process.env.OPENAI_API_KEY),
+        gnews: !!process.env.GNEWS_API_KEY,
+        newsapi: !!process.env.NEWS_API_KEY,
+        yahooFinance: true,
+      },
+      model: process.env.OPENAI_MODEL || 'gpt-4o',
+    });
+  });
+
   app.post('/api/analyze', async (req, res) => {
     const { prompt, stream } = req.body;
     if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
