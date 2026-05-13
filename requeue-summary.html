@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Requeue Open Questions — Summary</title>
+  <style>
+    :root {
+      --navy: #042C53;
+      --blue: #185FA5;
+      --green: #1D9E75;
+      --coral: #D85A30;
+      --amber: #BA7517;
+      --bg: #FAFAF9;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: #1a1a1a;
+      line-height: 1.7;
+      padding: 2rem;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+
+    .header {
+      background: linear-gradient(135deg, var(--navy), var(--blue));
+      color: white;
+      padding: 2.5rem;
+      border-radius: 14px;
+      margin-bottom: 2rem;
+    }
+    .header h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 0.3rem; }
+    .header .meta { opacity: 0.8; font-size: 0.85rem; }
+
+    .section { margin-bottom: 2rem; }
+    .section-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 2px solid #e5e5e5;
+    }
+
+    .question-card {
+      background: white;
+      border: 1px solid #e5e5e5;
+      border-left: 4px solid var(--coral);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .question-card h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--coral);
+      margin-bottom: 0.4rem;
+    }
+    .question-card p { font-size: 0.88rem; color: #444; }
+
+    .decision-card {
+      background: white;
+      border: 1px solid #e5e5e5;
+      border-left: 4px solid var(--green);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .decision-card h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--green);
+      margin-bottom: 0.4rem;
+    }
+    .decision-card p { font-size: 0.88rem; color: #444; }
+
+    .action-card {
+      background: #FFFBEB;
+      border: 1px solid #FDE68A;
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .action-card strong { color: var(--amber); }
+
+    .link { color: var(--blue); text-decoration: none; font-weight: 500; }
+    .link:hover { text-decoration: underline; }
+
+    .participants {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .participant {
+      background: #f0f0f0;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .ticket-ref {
+      display: inline-block;
+      background: #EEF2FF;
+      color: var(--blue);
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin: 0.2rem 0.3rem 0.2rem 0;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 1.5rem;
+      color: #999;
+      font-size: 0.75rem;
+      border-top: 1px solid #e5e5e5;
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="header">
+      <h1>📋 Requeue — Open Questions Summary</h1>
+      <p class="meta">Teams Chat Discussion • May 13, 2026 • Semi Requeue Phase 2.0</p>
+    </div>
+
+    <!-- Context -->
+    <div class="section">
+      <h2 class="section-title">Context</h2>
+      <p style="font-size: 0.9rem; color: #555; margin-bottom: 0.5rem;">
+        Discussion initiated by <strong>Aviv Nuriel</strong> regarding open questions raised by <strong>Anna Dremliuha</strong> about the notification behavior during visit cancellation/requeue/detach flows in the Semi Requeue Phase 2.0 implementation.
+      </p>
+      <p style="font-size: 0.85rem; color: #666;">
+        Reference: <a class="link" href="https://amwell.atlassian.net/wiki/spaces/CKB/pages/5229051930/Semi+Requeue+Phase+2.0+-+Low+Level+De">Semi Requeue Phase 2.0 — LLD</a>
+        &nbsp;|&nbsp;
+        <a class="link" href="https://amwell.atlassian.net/wiki/spaces/CKB/pages/4922245183/Cancel+re-Q+flow+investigation">Cancel/Re-Q Flow Investigation</a>
+      </p>
+    </div>
+
+    <!-- Open Questions -->
+    <div class="section">
+      <h2 class="section-title">🔴 Open Questions (Need Resolution)</h2>
+
+      <div class="question-card">
+        <h3>1. What to send in the notification — reasonText or reasonCode?</h3>
+        <p>What do we want to send to the user (practitioner or patient)? Both <code>reasonText/freeText</code> and <code>reasonCode/code</code>, or just one? Currently VCB sends reason code only.</p>
+        <p style="margin-top: 0.5rem; font-size: 0.82rem; color: #666;"><strong>Concern:</strong> If reasonText is empty, users see broken messages like "Your visit has been cancelled. ." — If reasonCode is used raw, users see "OTHER_TECHNICAL_ISSUE" which is not user-friendly.</p>
+      </div>
+
+      <div class="question-card">
+        <h3>2. Use isProviderCancelNotificationDisabled flag?</h3>
+        <p>Should we use the <code>isProviderCancelNotificationDisabled</code> flag which can disable sending notifications per tenant? Currently not set on production. Anna believes this is obsolete in VCB service.</p>
+      </div>
+
+      <div class="question-card">
+        <h3>3. What email subjects to use?</h3>
+        <p>Requirements specify email wording (content) but are missing the <strong>subject lines</strong> for each notification email.</p>
+      </div>
+
+      <div class="question-card">
+        <h3>4. Email template design — match old VCB_CANCELLED_MSG?</h3>
+        <p>How should the new emails look? Anna's assumption: same format as the old <code>VCB_CANCELLED_MSG</code> template. Needs confirmation.</p>
+      </div>
+    </div>
+
+    <!-- Decisions / Agreements -->
+    <div class="section">
+      <h2 class="section-title">✅ Decisions & Agreements</h2>
+
+      <div class="decision-card">
+        <h3>User-friendly text for each reason code</h3>
+        <p>Aviv suggested (and Anna agrees) that we should have <strong>user-friendly display text mapped to each reason code</strong> rather than showing raw codes or potentially-empty freetext to users.</p>
+      </div>
+
+      <div class="decision-card">
+        <h3>Use-case-based notification mapping needed</h3>
+        <p>Oded confirmed: there should be a <strong>use case list</strong>, and for each use case define what notification is sent/not sent, and what notification type. Oren Gaifman was supposed to create this clear mapping.</p>
+      </div>
+
+      <div class="decision-card">
+        <h3>Implementation ownership clarified</h3>
+        <p><strong>Sam Gamgee</strong> is working on VCB and NOTSRV. <strong>Danylo Herasymenko</strong> added for NOTSRV-4785 work.</p>
+      </div>
+    </div>
+
+    <!-- Action Items -->
+    <div class="section">
+      <h2 class="section-title">⚡ Action Items</h2>
+
+      <div class="action-card">
+        <strong>Oren Gaifman</strong> — Create clear mapping of notification behavior per use case/flow (was previously assigned, status unclear)
+      </div>
+      <div class="action-card">
+        <strong>Gidi Geras</strong> — Answer question #3 (email subjects) — tagged by Aviv
+      </div>
+      <div class="action-card">
+        <strong>Team</strong> — Confirm email template approach (reuse VCB_CANCELLED_MSG format or new design?)
+      </div>
+      <div class="action-card">
+        <strong>Team</strong> — Decide on <code>isProviderCancelNotificationDisabled</code> flag: deprecate or keep?
+      </div>
+    </div>
+
+    <!-- Related Tickets -->
+    <div class="section">
+      <h2 class="section-title">🎫 Related Tickets</h2>
+      <p>
+        <span class="ticket-ref"><a class="link" href="https://amwell.atlassian.net/browse/VIDCALLSVC-2098">VIDCALLSVC-2098</a></span>
+        Implementation almost done, waiting for clarifications
+      </p>
+      <p>
+        <span class="ticket-ref"><a class="link" href="https://amwell.atlassian.net/browse/NOTSRV-4785">NOTSRV-4785</a></span>
+        Almost done, waiting for design mockups
+      </p>
+    </div>
+
+    <!-- Participants -->
+    <div class="section">
+      <h2 class="section-title">👥 Participants</h2>
+      <div class="participants">
+        <span class="participant">Aviv Nuriel</span>
+        <span class="participant">Anna Dremliuha</span>
+        <span class="participant">Oded Falik</span>
+        <span class="participant">Barak Yehuda</span>
+        <span class="participant">Oren Gaifman</span>
+        <span class="participant">Gidi Geras</span>
+        <span class="participant">Danylo Herasymenko</span>
+        <span class="participant">Sam Gamgee</span>
+        <span class="participant">Tomer Levi</span>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="section">
+      <h2 class="section-title">📊 Status</h2>
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+        <tr style="background: #f9f9f9;">
+          <td style="padding: 0.6rem 1rem; border: 1px solid #e5e5e5; font-weight: 600;">Blockers</td>
+          <td style="padding: 0.6rem 1rem; border: 1px solid #e5e5e5;">Waiting on notification mapping + email subjects + template confirmation</td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; border: 1px solid #e5e5e5; font-weight: 600;">Implementation</td>
+          <td style="padding: 0.6rem 1rem; border: 1px solid #e5e5e5;">VIDCALLSVC-2098 ~done, NOTSRV-4785 ~done (both blocked on answers)</td>
+        </tr>
+        <tr style="background: #f9f9f9;">
+          <td style="padding: 0.6rem 1rem; border: 1px solid #e5e5e5; font-weight: 600;">Risk</td>
+          <td style="padding: 0.6rem 1rem; border: 1px solid #e5e5e5; color: var(--coral); font-weight: 600;">Medium — implementation paused until questions resolved</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="footer">
+      <p>Generated May 13, 2026 • Source: Teams Chat "Requeue - Open Questions"</p>
+    </div>
+
+  </div>
+</body>
+</html>

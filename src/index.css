@@ -1,0 +1,277 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@theme {
+    --font-heading: "Inter", sans-serif;
+    --font-sans: "Inter", sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
+    
+    --color-brand-navy: #042C53;
+    --color-brand-blue: #185FA5;
+    --color-brand-green: #1D9E75;
+    --color-brand-coral: #D85A30;
+    --color-brand-amber: #BA7517;
+    --color-brand-bone: #F1EFE8;
+
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --radius: 0.625rem;
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    }
+}
+
+/* Theme-aware card backgrounds */
+html.light .bg-zinc-950 {
+  background-color: #ffffff !important;
+  border-color: #e4e4e7 !important;
+}
+html.light .bg-zinc-900\/30,
+html.light .bg-zinc-900\/20,
+html.light .bg-zinc-900\/10 {
+  background-color: rgba(244, 244, 245, 0.7) !important;
+}
+html.light .border-zinc-900 {
+  border-color: #d4d4d8 !important;
+}
+html.light .border-zinc-800 {
+  border-color: #d4d4d8 !important;
+}
+html.light .text-zinc-100 {
+  color: #18181b !important;
+}
+html.light .text-zinc-200 {
+  color: #27272a !important;
+}
+html.light .text-zinc-300 {
+  color: #3f3f46 !important;
+}
+html.light .text-zinc-400 {
+  color: #52525b !important;
+}
+html.light .text-zinc-500 {
+  color: #52525b !important;
+}
+html.light .text-zinc-600 {
+  color: #3f3f46 !important;
+}
+html.light .text-zinc-700 {
+  color: #3f3f46 !important;
+}
+html.light .text-white {
+  color: #18181b !important;
+}
+html.light .text-white\/60 {
+  color: rgba(24, 24, 27, 0.7) !important;
+}
+html.light .text-white\/40 {
+  color: rgba(24, 24, 27, 0.5) !important;
+}
+html.light .text-white\/30 {
+  color: rgba(24, 24, 27, 0.4) !important;
+}
+html.light .text-white\/90 {
+  color: #18181b !important;
+}
+html.light .text-white\/70 {
+  color: rgba(24, 24, 27, 0.7) !important;
+}
+html.light .text-white\/80 {
+  color: rgba(24, 24, 27, 0.8) !important;
+}
+html.light .bg-black\/30 {
+  background-color: rgba(244, 244, 245, 0.7) !important;
+}
+html.light .bg-black\/40 {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+html.light .bg-brand-navy {
+  background-color: #ffffff !important;
+  border-color: #e4e4e7 !important;
+}
+html.light .bg-brand-navy\/95 {
+  background-color: rgba(255, 255, 255, 0.97) !important;
+}
+html.light .bg-brand-navy\/40 {
+  background-color: rgba(248, 250, 252, 0.6) !important;
+  border-color: #d4d4d8 !important;
+}
+html.light .border-white\/10 {
+  border-color: #d4d4d8 !important;
+}
+html.light .border-white\/5 {
+  border-color: #e4e4e7 !important;
+}
+html.light .border-white\/20 {
+  border-color: #a1a1aa !important;
+}
+html.light .bg-white\/5 {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+html.light .hover\:bg-white\/5:hover {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+/* Title gradient for light mode */
+html.light h1.bg-gradient-to-b {
+  background: linear-gradient(to bottom, #042C53, #185FA5) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+/* Sidebar text in light mode */
+html.light .text-brand-bone {
+  color: #18181b !important;
+}
+/* Try buttons in light mode */
+html.light button.border-zinc-900 {
+  border-color: #d4d4d8 !important;
+  color: #3f3f46 !important;
+}
+html.light button.border-zinc-900:hover {
+  border-color: #185FA5 !important;
+  color: #185FA5 !important;
+  background-color: rgba(24, 95, 165, 0.05) !important;
+}
+/* Card shadows in light mode */
+html.light .shadow-2xl {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
+}
+html.light .shadow-xl {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04) !important;
+}
+/* Verdict card in light mode */
+html.light .bg-brand-navy.border {
+  background-color: #042C53 !important;
+  color: white !important;
+}
+html.light .bg-brand-navy.border .text-white,
+html.light .bg-brand-navy.border .text-white\/30 {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+/* Progress bar background */
+html.light .bg-zinc-900 {
+  background-color: #e4e4e7 !important;
+}
+/* Search icon */
+html.light .text-white\/40 svg {
+  color: #a1a1aa !important;
+}
+/* Checkbox label */
+html.light .select-none {
+  color: #3f3f46 !important;
+}
