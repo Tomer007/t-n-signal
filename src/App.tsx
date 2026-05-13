@@ -173,6 +173,28 @@ export default function App() {
     }
   });
 
+  // Global keyboard shortcuts (Esc to close modals / cancel)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (zoomedWidget) {
+          setZoomedWidget(null);
+        } else if (showGuide) {
+          setShowGuide(false);
+        } else if (analyzeMutation.isPending && abortController) {
+          abortController.abort();
+          setAbortController(null);
+          analyzeMutation.reset();
+          setLongFormProgress(0);
+          setLongFormStep('');
+          toast.info('Analysis cancelled (Esc)');
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [zoomedWidget, showGuide, analyzeMutation.isPending, abortController]);
+
   const handleDownloadPDF = async () => {
     if (!currentReport) return;
     try {

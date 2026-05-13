@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sprint Risk Analysis — ADS Design System Team</title>
+  <style>
+    :root { --navy: #042C53; --blue: #185FA5; --green: #1D9E75; --coral: #D85A30; --amber: #BA7517; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #FAFAF9; color: #1a1a1a; line-height: 1.7; padding: 2rem; }
+    .container { max-width: 900px; margin: 0 auto; }
+    .header { background: linear-gradient(135deg, var(--navy), var(--blue)); color: white; padding: 2.5rem; border-radius: 14px; margin-bottom: 2rem; }
+    .header h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.3rem; }
+    .header .meta { opacity: 0.8; font-size: 0.85rem; }
+    .section { margin-bottom: 2rem; }
+    .section-title { font-size: 1.15rem; font-weight: 700; color: var(--navy); margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 2px solid #e5e5e5; }
+    .risk-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 0.75rem; }
+    .risk-card.critical { border-left: 4px solid #DC2626; }
+    .risk-card.high { border-left: 4px solid var(--amber); }
+    .risk-card.medium { border-left: 4px solid #3B82F6; }
+    .risk-card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .risk-card.critical h3 { color: #DC2626; }
+    .risk-card.high h3 { color: var(--amber); }
+    .risk-card.medium h3 { color: #3B82F6; }
+    .risk-card p { font-size: 0.85rem; color: #444; margin-bottom: 0.3rem; }
+    .risk-card .label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.15rem 0.5rem; border-radius: 4px; display: inline-block; margin-bottom: 0.5rem; }
+    .risk-card.critical .label { background: #FEE2E2; color: #991B1B; }
+    .risk-card.high .label { background: #FEF3C7; color: #92400E; }
+    .risk-card.medium .label { background: #DBEAFE; color: #1E40AF; }
+    .impact-box { background: #FFF7ED; border: 1px solid #FED7AA; border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
+    .impact-box h3 { color: var(--amber); font-size: 0.95rem; margin-bottom: 0.5rem; }
+    .impact-box p { font-size: 0.85rem; color: #555; }
+    table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; border-radius: 10px; overflow: hidden; border: 1px solid #e5e5e5; }
+    thead { background: var(--navy); color: white; }
+    th { padding: 0.7rem 1rem; text-align: left; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    td { padding: 0.7rem 1rem; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    .priority-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 700; }
+    .priority-badge.immediate { background: #FEE2E2; color: #991B1B; }
+    .priority-badge.today { background: #FEF3C7; color: #92400E; }
+    .priority-badge.decision { background: #FEF9C3; color: #854D0E; }
+    .footer { text-align: center; padding: 1.5rem; color: #999; font-size: 0.75rem; border-top: 1px solid #e5e5e5; margin-top: 2rem; }
+    .ticket { display: inline-block; background: #EEF2FF; color: var(--blue); padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.78rem; font-weight: 600; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="header">
+      <h1>⚠️ Sprint Risk Analysis</h1>
+      <p class="meta">ADS — Weddell Design System Team • Active Sprint • May 13, 2026</p>
+    </div>
+
+    <!-- Top 3 Risks -->
+    <div class="section">
+      <h2 class="section-title">🔴 Top 3 Sprint Risks</h2>
+
+      <div class="risk-card critical">
+        <span class="label">Critical</span>
+        <h3>1. UI Freeze — Infinite Change Detection Loop</h3>
+        <p><span class="ticket">ADS-8234</span> — <code>aw-select-search</code> causes infinite CD loop with content-projected options. Status: <strong>Code Review</strong>.</p>
+        <p><strong>Risk:</strong> If this ships broken, it freezes any consumer page using the select-search component. Labeled <code>Angular21</code> — likely a regression from the Angular 21 upgrade.</p>
+        <p><strong>Mitigation:</strong> Prioritize code review completion today. Add regression test before merge. Consider feature flag if fix is risky.</p>
+      </div>
+
+      <div class="risk-card high">
+        <span class="label">High</span>
+        <h3>2. Two Release Stories Not Started</h3>
+        <p><span class="ticket">ADS-8264</span> (v4.2.67) and <span class="ticket">ADS-8263</span> (v5.0.20) — both "Ready for Development". Labeled <code>ConvergeRelease</code>.</p>
+        <p><strong>Risk:</strong> These block downstream teams (Consumer, Admin UI) who depend on the latest ADS fixes. If releases don't ship this sprint, dependent teams are stuck.</p>
+        <p><strong>Mitigation:</strong> Start immediately. These are typically packaging/versioning tasks — assign to Ivan Shmyhal who owns both.</p>
+      </div>
+
+      <div class="risk-card medium">
+        <span class="label">Capacity</span>
+        <h3>3. Multiple Items Not Started — Overcommitment Risk</h3>
+        <p><span class="ticket">ADS-7742</span>, <span class="ticket">ADS-8169</span>, <span class="ticket">ADS-8264</span>, <span class="ticket">ADS-8263</span> — 4 items still in "Ready for Development".</p>
+        <p><strong>Risk:</strong> With 15 total items and several still in progress, the team may be overcommitted. Spillover to next sprint likely.</p>
+        <p><strong>Mitigation:</strong> Triage — decide which items are committed vs. stretch. Kibana report (ADS-7742) and nav panel issue (ADS-8169) could be deferred.</p>
+      </div>
+    </div>
+
+    <!-- Impact on Sprint Goal -->
+    <div class="section">
+      <h2 class="section-title">📊 Impact on Sprint Goal</h2>
+      <div class="impact-box">
+        <h3>No explicit sprint goal defined</h3>
+        <p>Based on work composition, the primary focus appears to be: <strong>Angular 21 stabilization + ADS releases + WCAG accessibility fixes</strong>.</p>
+        <p style="margin-top: 0.5rem;">The Critical UI freeze bug (<span class="ticket">ADS-8234</span>) <strong>directly threatens the Angular 21 goal</strong> — if unresolved, the 5.0.20 release can't ship safely. Release stories being unstarted threatens downstream teams who depend on ADS updates.</p>
+      </div>
+    </div>
+
+    <!-- Mitigation Table -->
+    <div class="section">
+      <h2 class="section-title">✅ Mitigation Suggestions</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Action</th>
+            <th>Owner</th>
+            <th>Priority</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Complete code review for ADS-8234 (UI freeze)</td>
+            <td>Roman Masyahin + reviewer</td>
+            <td><span class="priority-badge immediate">🔴 Immediate</span></td>
+          </tr>
+          <tr>
+            <td>Start ADS-8264 and ADS-8263 release stories</td>
+            <td>Ivan Shmyhal</td>
+            <td><span class="priority-badge today">🟠 Today</span></td>
+          </tr>
+          <tr>
+            <td>Verify ADS-8234 fix doesn't regress other Angular 21 components</td>
+            <td>Team</td>
+            <td><span class="priority-badge today">🟠 Before release</span></td>
+          </tr>
+          <tr>
+            <td>Add regression test for infinite CD loop scenario</td>
+            <td>Roman Masyahin</td>
+            <td><span class="priority-badge today">🟠 With the fix</span></td>
+          </tr>
+          <tr>
+            <td>Defer ADS-7742 (Kibana report) to next sprint if capacity tight</td>
+            <td>Sergey Muhin</td>
+            <td><span class="priority-badge decision">🟡 Decision needed</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Sprint Items Overview -->
+    <div class="section">
+      <h2 class="section-title">📋 Sprint Items Overview</h2>
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority</th><th>Assignee</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="ticket">ADS-8234</span></td><td>aw-select-search: UI freeze (infinite CD loop)</td><td>Code Review</td><td>Critical</td><td>Roman Masyahin</td></tr>
+          <tr><td><span class="ticket">ADS-8264</span></td><td>ADS 4.2.67 Release Story</td><td>Ready for Dev</td><td>High</td><td>Ivan Shmyhal</td></tr>
+          <tr><td><span class="ticket">ADS-8263</span></td><td>ADS 5.0.20 Release Story</td><td>Ready for Dev</td><td>High</td><td>Ivan Shmyhal</td></tr>
+          <tr><td><span class="ticket">ADS-7742</span></td><td>Kibana report update for 5.0.0+</td><td>Ready for Dev</td><td>High</td><td>Sergey Muhin</td></tr>
+          <tr><td><span class="ticket">ADS-8236</span></td><td>Divider layout without stepper</td><td>Functional Review</td><td>Major</td><td>Ivan Shmyhal</td></tr>
+          <tr><td><span class="ticket">ADS-8174</span></td><td>Consumer - Find Your Pharmacy</td><td>Implementing</td><td>Major</td><td>Alexandr Kirov</td></tr>
+          <tr><td><span class="ticket">ADS-8169</span></td><td>Navigation panel icon layout (small screen)</td><td>Ready for Dev</td><td>Major</td><td>Vakhtanh Mkheidze</td></tr>
+          <tr><td><span class="ticket">ADS-8139</span></td><td>aw-input-password: NVDA reads entire list</td><td>Implementing</td><td>Major</td><td>Vlad Ivchenko</td></tr>
+          <tr><td><span class="ticket">ADS-8003</span></td><td>Recheck consumer pages after deploy</td><td>Implementing</td><td>Major</td><td>Ivan Shmyhal</td></tr>
+          <tr><td><span class="ticket">ADS-7883</span></td><td>Responsive dialog adjustments</td><td>Markup In Progress</td><td>Major</td><td>Alina Sterleva</td></tr>
+          <tr><td><span class="ticket">ADS-7595</span></td><td>Navigation Mobile text contrast (WCAG)</td><td>Ready for Markup</td><td>Major</td><td>Vakhtanh Mkheidze</td></tr>
+          <tr><td><span class="ticket">ADS-8194</span></td><td>Yukon Sprint Plan</td><td>Implementing</td><td>Major</td><td>Kristina Zelenina</td></tr>
+          <tr><td><span class="ticket">ADS-8185</span></td><td>Xingu sprint ADS managers tasks</td><td>Implementing</td><td>Major</td><td>Kristina Zelenina</td></tr>
+          <tr><td><span class="ticket">ADS-8200</span></td><td>Weddell Sprint Report - Design System</td><td>Closed</td><td>Major</td><td>Alina Sterleva</td></tr>
+          <tr><td><span class="ticket">ADS-8186</span></td><td>Weddell Sprint Report - Raven Team</td><td>Closed</td><td>Normal</td><td>Alina Sterleva</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer">
+      <p>Generated May 13, 2026 • Source: Jira ADS Project Active Sprint</p>
+    </div>
+
+  </div>
+</body>
+</html>
