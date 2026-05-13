@@ -355,7 +355,22 @@ export default function App() {
               <BarChart3 className="h-5 w-5" />
             </Button>
             <div className={`hidden md:flex items-center gap-2 text-sm ${theme === 'dark' ? 'text-white/40' : 'text-zinc-400'}`}>
-              <span className="hover:text-white/80 cursor-pointer transition-colors">Terminal</span>
+              <span className="hover:text-white/80 cursor-pointer transition-colors" onClick={() => {
+                const resources = [
+                  { name: 'Yahoo Finance', url: 'https://finance.yahoo.com' },
+                  { name: 'TradingView', url: 'https://www.tradingview.com' },
+                  { name: 'Finviz Screener', url: 'https://finviz.com/screener.ashx' },
+                  { name: 'Seeking Alpha', url: 'https://seekingalpha.com' },
+                  { name: 'Macrotrends', url: 'https://www.macrotrends.net' },
+                  { name: 'SEC EDGAR', url: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany' },
+                  { name: 'FRED Economic Data', url: 'https://fred.stlouisfed.org' },
+                  { name: 'ETF.com', url: 'https://www.etf.com' },
+                ];
+                const win = window.open('', '_blank', 'width=400,height=500');
+                if (win) {
+                  win.document.write(`<html><head><title>T&N Signal — Resources</title><style>body{font-family:system-ui;padding:2rem;background:#0a0a0a;color:#e5e5e5}h2{margin-bottom:1rem;color:#1D9E75}a{display:block;padding:0.75rem 1rem;margin:0.5rem 0;border-radius:8px;background:#1a1a1a;color:#60a5fa;text-decoration:none;border:1px solid #333;transition:all 0.2s}a:hover{background:#222;border-color:#60a5fa}</style></head><body><h2>📡 Resources</h2>${resources.map(r => `<a href="${r.url}" target="_blank">${r.name}</a>`).join('')}</body></html>`);
+                }
+              }}>Terminal</span>
               <span className="opacity-20">/</span>
               <span className={`font-medium ${theme === 'dark' ? 'text-white/90' : 'text-zinc-900'}`}>Research</span>
             </div>
