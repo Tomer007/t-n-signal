@@ -58,6 +58,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [zoomedWidget, setZoomedWidget] = useState<string | null>(null);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tn-alpha-theme');
@@ -73,16 +74,16 @@ export default function App() {
     localStorage.setItem('tn-alpha-theme', theme);
   }, [theme]);
 
-  // Load search history from server on mount
+  // Load search history from server on mount (queries only, content loaded lazily on click)
   useEffect(() => {
     axios.get('/api/history').then(res => {
       if (res.data.history && Array.isArray(res.data.history)) {
         setHistory(res.data.history.map((h: { query: string }) => h.query));
-        // Build lookup map for cached reports
-        const dataMap: Record<string, { report?: any; longFormContent?: string; prompt?: string }> = {};
+        // Only cache report metadata, skip longFormContent to save memory
+        const dataMap: Record<string, { report?: AnalysisReport; longFormContent?: string; prompt?: string }> = {};
         res.data.history.forEach((h: any) => {
-          if (h.report || h.longFormContent) {
-            dataMap[h.query] = { report: h.report, longFormContent: h.longFormContent, prompt: h.prompt };
+          if (h.report) {
+            dataMap[h.query] = { report: h.report, prompt: h.prompt };
           }
         });
         setHistoryData(dataMap);
@@ -96,6 +97,10 @@ export default function App() {
     mutationFn: async (targetQuery?: string) => {
       const activeQuery = (targetQuery || query).trim();
       if (!activeQuery) return;
+
+      // Create abort controller for cancellation
+      const controller = new AbortController();
+      setAbortController(controller);
       
       setLongFormProgress(0);
       setLongFormStep('Fetching market data sampled...');
@@ -103,8 +108,8 @@ export default function App() {
       setHistory(prev => Array.from(new Set([upperQuery, ...prev])).slice(0, 50));
       
       try {
-        const marketRes = await axios.post('/api/market-data', { ticker: activeQuery.toUpperCase() });
-        const newsRes = await axios.post('/api/news', { query: activeQuery });
+        const marketRes = await axios.post('/api/market-data', { ticker: activeQuery.toUpperCase() }, { signal: controller.signal });
+        const newsRes = await axios.post('/api/news', { query: activeQuery }, { signal: controller.signal });
         
         setMarketData(marketRes.data);
 
@@ -413,8 +418,11 @@ export default function App() {
                     {analyzeMutation.isPending ? (
                       <Button 
                         onClick={() => {
-                          // Cancel is not natively supported by react-query mutations,
-                          // but we can reset the UI state
+                          // Actually cancel the network requests
+                          if (abortController) {
+                            abortController.abort();
+                            setAbortController(null);
+                          }
                           analyzeMutation.reset();
                           setLongFormProgress(0);
                           setLongFormStep('');
