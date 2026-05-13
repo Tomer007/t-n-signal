@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateReport } from '../src/lib/ai
+import { validateReport } from '../src/lib/ai';
 
 const validReport = {
   ticker: 'AAPL',

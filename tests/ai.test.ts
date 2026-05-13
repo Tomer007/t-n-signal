@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import axios from 'axios';
-import { generateShortReport, INSTITUTIONAL_STOCK_PROMPT, INSTITUTIONAL_SECTOR_PROMPT } from '../src/lib/ai
+import { generateShortReport, INSTITUTIONAL_STOCK_PROMPT, INSTITUTIONAL_SECTOR_PROMPT } from '../src/lib/ai';
 import { MarketData, NewsItem } from '../src/types';
 
 vi.mock('axios');

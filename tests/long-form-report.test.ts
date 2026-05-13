@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { generateLongFormReport } from '../src/lib/ai
+import { generateLongFormReport } from '../src/lib/ai';
 import { MarketData, NewsItem } from '../src/types';
 
 const mockMarketData: MarketData = {
@@ -55,7 +55,7 @@ describe('generateLongFormReport', () => {
     expect(first.value).toBeDefined();
     expect(first.value!.step).toContain('Initializing');
     expect(first.value!.progress).toBe(5);
-    expect(first.value!.content).toContain('T&N Alpha');
+    expect(first.value!.content).toContain('T&N Signal');
   });
 
   it('uses stock prompt for non-sector queries', async () => {

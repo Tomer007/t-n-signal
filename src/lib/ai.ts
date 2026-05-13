@@ -152,7 +152,7 @@ Analyze the following stock/sector: ${query}
     return { report: validateReport(parsed), prompt };
   } catch (err: any) {
     console.error("Analysis Error:", err);
-    throw new Error(err.message || "Failed to generate research report with T&N Alpha AI.");
+    throw new Error(err.message || "Failed to generate research report with T&N Signal AI.");
   }
 }
 
@@ -185,17 +185,17 @@ export async function* generateLongFormReport(data: MarketData, newsData: NewsIt
     "SECTION 13 — APPENDIX"
   ];
 
-  let fullReport = `# T&N Alpha: Institutional Research Report\n\n`;
+  let fullReport = `# T&N Signal: Institutional Research Report\n\n`;
   fullReport += `${finalPromptHeader}\n\n`;
   fullReport += `--- \n\n`;
 
-  yield { step: "Initializing T&N Alpha Engine...", progress: 5, content: fullReport, prompt: finalPromptHeader };
+  yield { step: "Initializing T&N Signal Engine...", progress: 5, content: fullReport, prompt: finalPromptHeader };
 
   for (let i = 0; i < sections.length; i++) {
     const sectionTitle = sections[i];
     yield { step: `Synthesizing ${sectionTitle}...`, progress: 10 + (i / sections.length) * 85, content: fullReport, prompt: finalPromptHeader };
 
-    const sectionPrompt = `You are "T&N Alpha", a Senior Equity Research Analyst. 
+    const sectionPrompt = `You are "T&N Signal", a Senior Equity Research Analyst. 
     Write the following section of the report: ${sectionTitle}
     
     REPORT CONTEXT:
