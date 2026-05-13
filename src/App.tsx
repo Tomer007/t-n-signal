@@ -148,11 +148,11 @@ function ServiceStatus({ name, envKey, description, alwaysOn }: { name: string; 
 export default function App() {
   const APP_VERSION = '1.0.0';
   const LOADING_VIDEOS = [
+    '/videos/YTDown_YouTube_Eliud-Kipchoge-the-greatest-marathon-run_Media_VkrebDIx9UQ_001_1080p.mp4',
     '/videos/13494091_2160_3840_25fps.mp4',
     '/videos/13749818_1440_2560_50fps.mp4',
     '/videos/15508753_2160_3840_60fps.mp4',
     '/videos/3209242-uhd_3840_2160_25fps.mp4',
-    '/videos/YTDown_YouTube_Eliud-Kipchoge-the-greatest-marathon-run_Media_VkrebDIx9UQ_001_1080p.mp4',
   ];
   const [loadingVideo] = useState(() => LOADING_VIDEOS[Math.floor(Math.random() * LOADING_VIDEOS.length)]);
   const [query, setQuery] = useState('');
@@ -944,6 +944,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                     playsInline
                     className="w-full h-full object-cover max-h-[40vh]"
                     src={loadingVideo}
+                    onError={(e) => { (e.target as HTMLVideoElement).src = '/videos/YTDown_YouTube_Eliud-Kipchoge-the-greatest-marathon-run_Media_VkrebDIx9UQ_001_1080p.mp4'; }}
                   />
                 </motion.div>
                 {/* Progress card */}

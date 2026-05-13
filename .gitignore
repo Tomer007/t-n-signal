@@ -7,4 +7,5 @@ data/
 *.log
 .env*
 !.env.example
-public/videos/
+public/videos/*.mp4
+!public/videos/YTDown_YouTube_Eliud-Kipchoge-the-greatest-marathon-run_Media_VkrebDIx9UQ_001_1080p.mp4
