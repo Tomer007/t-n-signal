@@ -546,6 +546,8 @@ export default function App() {
     setGrahamLoading(true);
     setGrahamContent('');
     const ticker = currentReport.ticker;
+    const quote = marketData?.quote;
+    const summary = marketData?.summary;
 
     const grahamPrompt = `You are a value investing analyst applying Benjamin Graham's framework from "The Intelligent Investor" and "Security Analysis." Analyze the following stock against Graham's complete defensive investor criteria and provide a verdict using the EXACT output format specified below.
 
@@ -553,12 +555,21 @@ export default function App() {
 
 ---
 
+## AVAILABLE MARKET DATA (use this — do NOT say you cannot fetch data):
+${JSON.stringify(quote, null, 2)}
+
+## FINANCIAL SUMMARY:
+${JSON.stringify(summary, null, 2)}
+
+---
+
 ## INSTRUCTIONS
-1. Fetch the most recent available financial data (latest annual report, current price, TTM where applicable).
-2. Use the current AAA corporate bond yield as the benchmark (state the rate and date).
+1. Use the market data provided above. Do NOT refuse or say you cannot access data — it is provided.
+2. Use AAA corporate bond yield of approximately 5.0% as benchmark (or state if different).
 3. Show calculations explicitly where required.
 4. Follow the OUTPUT FORMAT below exactly — do not deviate from the structure.
 5. Use ✅ for PASS, ❌ for FAIL, ⚠️ for PARTIAL/UNKNOWN.
+6. If a specific data point is not available in the provided data, mark it as ⚠️ UNKNOWN.
 
 ---
 

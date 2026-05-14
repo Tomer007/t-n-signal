@@ -82,27 +82,49 @@ async function startServer() {
     return path.join(apiLogsDir, `${date}.json`);
   }
 
+  // Async log queue to prevent race conditions
+  let logQueue: any[] = [];
+  let isWriting = false;
+
   function appendApiLog(entry: { time: string; service: string; status: string; message: string; endpoint?: string }) {
-    const filepath = getLogFilePath();
-    let logs: any[] = [];
+    logQueue.push({ ...entry, timestamp: new Date().toISOString() });
+    flushLogQueue();
+  }
+
+  async function flushLogQueue() {
+    if (isWriting || logQueue.length === 0) return;
+    isWriting = true;
+    const entries = [...logQueue];
+    logQueue = [];
+    
     try {
-      if (fs.existsSync(filepath)) {
-        logs = JSON.parse(fs.readFileSync(filepath, 'utf-8'));
-      }
-    } catch {}
-    logs.push({ ...entry, timestamp: new Date().toISOString() });
-    fs.writeFileSync(filepath, JSON.stringify(logs, null, 2), 'utf-8');
+      const filepath = getLogFilePath();
+      let logs: any[] = [];
+      try {
+        if (fs.existsSync(filepath)) {
+          logs = JSON.parse(await fs.promises.readFile(filepath, 'utf-8'));
+        }
+      } catch {}
+      logs.push(...entries);
+      await fs.promises.writeFile(filepath, JSON.stringify(logs, null, 2), 'utf-8');
+    } catch (e) {
+      // Re-queue on failure
+      logQueue.unshift(...entries);
+    } finally {
+      isWriting = false;
+      if (logQueue.length > 0) flushLogQueue();
+    }
   }
 
   function cleanOldLogs() {
     try {
-      const files = fs.readdirSync(apiLogsDir).filter(f => f.endsWith('.json'));
+      const files = fs.readdirSync(apiLogsDir).filter(f => f.endsWith('.json') && /^\d{4}-\d{2}-\d{2}\.json$/.test(f));
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - 24);
       for (const file of files) {
         const dateStr = file.replace('.json', '');
         const fileDate = new Date(dateStr);
-        if (fileDate < cutoff) {
+        if (!isNaN(fileDate.getTime()) && fileDate < cutoff) {
           fs.unlinkSync(path.join(apiLogsDir, file));
         }
       }
@@ -179,6 +201,9 @@ async function startServer() {
   app.post('/api/analyze', async (req, res) => {
     const { prompt, stream } = req.body;
     if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
+    if (typeof prompt !== 'string' || prompt.length > 50000) {
+      return res.status(400).json({ error: 'Prompt too long (max 50,000 characters)' });
+    }
 
     const model = process.env.OPENAI_MODEL || 'gpt-4o';
 
@@ -195,15 +220,17 @@ async function startServer() {
           stream: true,
         });
 
+        let outputChars = 0;
         for await (const chunk of completion) {
           const content = chunk.choices[0]?.delta?.content || '';
           if (content) {
+            outputChars += content.length;
             res.write(`data: ${JSON.stringify({ content })}\n\n`);
           }
         }
         res.write('data: [DONE]\n\n');
-        // Estimate tokens for streaming (rough: 4 chars ≈ 1 token)
-        trackCost('openai', model, Math.ceil(prompt.length / 4), 500);
+        // Estimate tokens: ~4 chars per token
+        trackCost('openai', model, Math.ceil(prompt.length / 4), Math.ceil(outputChars / 4));
         res.end();
       } else {
         const completion = await openai.chat.completions.create({
@@ -461,155 +488,22 @@ async function startServer() {
   });
 
   // ═══════════════════════════════════════════════════════════════
-  // Gemini — Hebrew Infographic Generation
-  // ═══════════════════════════════════════════════════════════════
-  app.post('/api/hebrew-infographic', async (req, res) => {
-    const { report, ticker } = req.body;
-    if (!report) return res.status(400).json({ error: 'report data is required' });
-
-    const recHeb = report.recommendation === 'BUY' ? 'קנייה' : report.recommendation === 'SELL' ? 'מכירה' : report.recommendation === 'HOLD' ? 'החזקה' : 'מעקב';
-    const recColor = report.recommendation === 'BUY' ? '#1D9E75' : report.recommendation === 'SELL' ? '#D85A30' : '#BA7517';
-
-    const prompt = `אתה מעצב אינפוגרפיקה פיננסית ברמה מוסדית בעברית. צור דף HTML יחיד — אינפוגרפיקה מלאה, מקצועית ומודרנית בעברית (RTL) עבור המניה ${ticker || 'N/A'}.
-
-═══════════════════════════════════════
-נתוני המניה:
-═══════════════════════════════════════
-- סימול: ${report.ticker || ticker}
-- סיכום אנליסט: ${report.summary || ''}
-- המלצה: ${recHeb} (${report.recommendation})
-- ציון סנטימנט שוק: ${report.sentimentScore || 0}/100
-- ציון סיכון: ${report.riskScore || 0}/100
-- רמת ביטחון: ${report.confidence || 0}%
-- יעד כניסה: ${report.priceTargets?.entry || 'N/A'}
-- יעד יציאה: ${report.priceTargets?.exit || 'N/A'}
-- חוזקות: ${report.swot?.strengths?.join(' | ') || 'N/A'}
-- חולשות: ${report.swot?.weaknesses?.join(' | ') || 'N/A'}
-- הזדמנויות: ${report.swot?.opportunities?.join(' | ') || 'N/A'}
-- איומים: ${report.swot?.threats?.join(' | ') || 'N/A'}
-- קטליסטים קרובים: ${report.catalysts?.join(' | ') || 'N/A'}
-- מדדים פיננסיים: ${report.metrics?.map((m: any) => m.label + ': ' + m.value).join(' | ') || 'N/A'}
-
-═══════════════════════════════════════
-דרישות עיצוב (חובה):
-═══════════════════════════════════════
-1. HTML מלא עם CSS inline בלבד (ללא קבצים חיצוניים, ללא JavaScript)
-2. כיוון RTL מלא — dir="rtl" lang="he"
-3. <title> tag: "${ticker} — ${recHeb} | T&N Signal"
-4. עיצוב פרימיום מודרני — השראה מ-Bloomberg Terminal ו-Figma:
-   - רקע: linear-gradient(160deg, #0a0a0a 0%, #0d1b2a 50%, #042C53 100%)
-   - טקסט ראשי: #f5f5f5, משני: #a1a1aa
-   - כרטיסים: background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; backdrop-filter: blur(10px); padding: 24px;
-   - פונט: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif
-   - box-shadow: 0 4px 30px rgba(0,0,0,0.3) על כרטיסים
-   - spacing: gap: 20px בין אלמנטים
-5. צבעי מותג: ירוק #1D9E75, כחול #185FA5, כתום #D85A30, נייבי #042C53, ענבר #BA7517
-6. צבע ההמלצה: ${recColor} — תג ההמלצה צריך להיות בולט עם רקע צבעוני ו-border-radius: 8px, padding: 8px 20px, font-size: 28px, font-weight: 900
-
-═══════════════════════════════════════
-מבנה האינפוגרפיקה (חובה — בסדר הזה):
-═══════════════════════════════════════
-א. HEADER — רקע גרדיאנט כהה יותר, כולל:
-   - לוגו טקסטואלי "T&N Signal" בפינה (font-size: 12px, opacity: 0.5)
-   - שם המניה/קרן בגדול (font-size: 32px, font-weight: 900)
-   - תג המלצה צבעוני: "${recHeb}" עם רקע ${recColor} וטקסט לבן
-   - תאריך: ${new Date().toLocaleDateString('he-IL')}
-
-ב. סיכום מנהלים — כרטיס עם border-right: 4px solid ${recColor}
-   - 3-4 משפטים על המניה: מה החברה עושה, מצב נוכחי, למה מעניינת/מסוכנת
-   - font-size: 15px, line-height: 1.8
-
-ג. מדדים פיננסיים — grid של 3 עמודות × 2 שורות (6 כרטיסים קטנים):
-   - כל כרטיס: ערך גדול (font-size: 22px, font-weight: 800) + תווית קטנה מתחת (font-size: 11px, color: #71717a)
-   - הכרטיסים: שווי שוק, P/E, טווח 52 שבועות, דיבידנד/תשואה, ביטחון, בטא
-
-ד. מד סנטימנט — כרטיס עם:
-   - כותרת "סנטימנט שוק"
-   - progress bar מעוצב: height: 12px, border-radius: 6px, רקע #1a1a2e
-   - מילוי בצבע גרדיאנט (אדום→ענבר→ירוק לפי הציון)
-   - מספר הציון בגדול ליד ה-bar
-
-ה. מד סיכון — אותו סגנון כמו סנטימנט אבל עם צבעים הפוכים (ירוק=נמוך, אדום=גבוה)
-
-ו. SWOT — grid 2×2:
-   - חוזקות: רקע rgba(29,158,117,0.1), border: 1px solid rgba(29,158,117,0.3)
-   - חולשות: רקע rgba(216,90,48,0.1), border: 1px solid rgba(216,90,48,0.3)
-   - הזדמנויות: רקע rgba(24,95,165,0.1), border: 1px solid rgba(24,95,165,0.3)
-   - איומים: רקע rgba(186,117,23,0.1), border: 1px solid rgba(186,117,23,0.3)
-   - כל תא: כותרת bold + נקודות bullet
-
-ז. יעדי מחיר — כרטיס בולט עם 2 עמודות:
-   - כניסה: ירוק גדול
-   - יציאה: כחול גדול
-   - border: 2px solid rgba(29,158,117,0.3)
-
-ח. קטליסטים — רשימה עם אייקון ⚡ לפני כל פריט, font-size: 14px
-
-ט. פוטר — שורה אחת, font-size: 10px, opacity: 0.4:
-   "אינפוגרפיקה זו נוצרה על ידי T&N Signal. אין זו המלצת השקעה. לצורכי מידע בלבד."
-
-═══════════════════════════════════════
-כללים:
-═══════════════════════════════════════
-- max-width: 800px, margin: 40px auto, padding: 40px
-- מותאם להדפסה (A4) — @media print { background: #0a0a0a !important; }
-- החזר רק את קוד ה-HTML. ללא הסברים, ללא markdown, ללא טקסט מחוץ ל-HTML.`;
-
-    // Helper to extract HTML from AI response
-    function extractHtml(text: string): string {
-      const htmlMatch = text.match(/```html\n?([\s\S]*?)```/) || text.match(/<!DOCTYPE[\s\S]*/i);
-      return htmlMatch ? (htmlMatch[1] || htmlMatch[0]) : text;
-    }
-
-    // Try Gemini first, fall back to OpenAI
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    if (GEMINI_API_KEY) {
-      try {
-        const geminiRes = await axios.post(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-          {
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 8192 }
-          },
-          { timeout: 60000 }
-        );
-        const text = geminiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        if (text) {
-          return res.json({ html: extractHtml(text), provider: 'gemini' });
-        }
-      } catch (geminiErr: any) {
-        console.warn('Gemini failed (falling back to OpenAI):', geminiErr.response?.status || geminiErr.message);
-      }
-    }
-
-    // Fallback: OpenAI
-    try {
-      const openai = getOpenAI();
-      const model = process.env.OPENAI_MODEL || 'gpt-4o';
-      const completion = await openai.chat.completions.create({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 8192,
-      });
-      const usage = completion.usage;
-      if (usage) {
-        trackCost('openai', model, usage.prompt_tokens, usage.completion_tokens);
-      }
-      const text = completion.choices[0]?.message?.content || '';
-      if (text) {
-        return res.json({ html: extractHtml(text), provider: 'openai' });
-      }
-      res.status(500).json({ error: 'No content returned from AI' });
-    } catch (error: any) {
-      console.error('Infographic Error (both providers failed):', error.message);
-      res.status(500).json({ error: error.message || 'Failed to generate Hebrew infographic' });
-    }
-  });
-
-  // ═══════════════════════════════════════════════════════════════
   // Market Overview — S&P 500, NASDAQ, Top Movers
   // ═══════════════════════════════════════════════════════════════
+
+
+  // ═══════════════════════════════════════════════════════════════
+  // Market Overview — S&P 500, NASDAQ, Top Movers (cached 60s)
+  // ═══════════════════════════════════════════════════════════════
+  let marketOverviewCache: { data: any; timestamp: number } | null = null;
+  const CACHE_TTL = 60_000; // 60 seconds
+
   app.get('/api/market-overview', async (req, res) => {
+    // Return cached data if fresh
+    if (marketOverviewCache && Date.now() - marketOverviewCache.timestamp < CACHE_TTL) {
+      return res.json(marketOverviewCache.data);
+    }
+
     try {
       const indices = ['^GSPC', '^IXIC', '^DJI', '^VIX', '^TNX', 'GC=F', 'CL=F', 'BTC-USD', 'DX-Y.NYB']; // S&P 500, NASDAQ, Dow, VIX, 10Y Treasury, Gold, Oil, Bitcoin, USD Index
       const topStocks = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA', 'BRK-B', 'JPM', 'V'];
@@ -642,7 +536,9 @@ async function startServer() {
         }))
         .sort((a: any, b: any) => Math.abs(b.changePercent) - Math.abs(a.changePercent));
 
-      res.json({ indices: indicesData, movers });
+      const result = { indices: indicesData, movers };
+      marketOverviewCache = { data: result, timestamp: Date.now() };
+      res.json(result);
     } catch (error: any) {
       console.error('Market overview error:', error.message);
       res.status(500).json({ error: error.message });
