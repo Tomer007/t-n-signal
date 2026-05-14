@@ -334,6 +334,10 @@ export default function App() {
           console.warn('Auto-save failed:', err.message);
         });
       }
+      // Auto-run Graham Analysis after report completes
+      if (data?.short) {
+        setTimeout(() => runGrahamAnalysis(data.short), 300);
+      }
     },
     onError: (err: any) => {
       console.error(err);
@@ -541,13 +545,14 @@ export default function App() {
     toast.success('Markdown downloaded! You can now upload this to NotebookLM.');
   };
 
-  const runGrahamAnalysis = async () => {
-    if (!currentReport?.ticker) return;
+  const runGrahamAnalysis = async (overrideReport?: AnalysisReport, overrideMarketData?: MarketData | null) => {
+    const report = overrideReport || currentReport;
+    if (!report?.ticker) return;
     setGrahamLoading(true);
     setGrahamContent('');
-    const ticker = currentReport.ticker;
-    const quote = marketData?.quote;
-    const summary = marketData?.summary;
+    const ticker = report.ticker;
+    const quote = (overrideMarketData || marketData)?.quote;
+    const summary = (overrideMarketData || marketData)?.summary;
 
     const grahamPrompt = `You are a value investing analyst applying Benjamin Graham's framework from "The Intelligent Investor" and "Security Analysis." Analyze the following stock against Graham's complete defensive investor criteria and provide a verdict using the EXACT output format specified below.
 
@@ -698,7 +703,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: grahamPrompt, stream: true })
+        body: JSON.stringify({ prompt: grahamPrompt, stream: true, model: 'gpt-4o-mini' })
       });
 
       if (!response.ok) throw new Error(`Server returned ${response.status}`);
@@ -1129,6 +1134,9 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => { setCurrentReport(null); setMarketData(null); setGrahamContent(''); setQuery(''); }} className="border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white">
+                  ← New Search
+                </Button>
                 <Button variant="outline" size="sm" onClick={handleDownloadPDF} className="border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white">
                   <Download className="h-4 w-4 mr-2" /> EXPORT REPORT
                 </Button>

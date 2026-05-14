@@ -199,13 +199,13 @@ async function startServer() {
   });
 
   app.post('/api/analyze', async (req, res) => {
-    const { prompt, stream } = req.body;
+    const { prompt, stream, model: requestModel } = req.body;
     if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
     if (typeof prompt !== 'string' || prompt.length > 50000) {
       return res.status(400).json({ error: 'Prompt too long (max 50,000 characters)' });
     }
 
-    const model = process.env.OPENAI_MODEL || 'gpt-4o';
+    const model = requestModel || process.env.OPENAI_MODEL || 'gpt-4o';
 
     try {
       const openai = getOpenAI();
