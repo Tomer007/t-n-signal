@@ -1400,20 +1400,6 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                         ⛶ Expand
                       </Button>
                     )}
-                    <Button
-                      size="sm"
-                      onClick={(e) => { e.stopPropagation(); runGrahamAnalysis(); }}
-                      disabled={grahamLoading}
-                      className="bg-brand-green hover:bg-brand-green/80 text-white font-bold px-5 shadow-lg shadow-brand-green/20"
-                    >
-                      {grahamLoading ? (
-                        <><Loader2 className="h-3.5 w-3.5 animate-spin mr-2" /> Analyzing...</>
-                      ) : grahamContent ? (
-                        <>↻ Re-run</>
-                      ) : (
-                        <>▶ Run Analysis</>
-                      )}
-                    </Button>
                   </div>
                 </div>
               </CardHeader>
