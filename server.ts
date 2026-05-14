@@ -606,6 +606,49 @@ async function startServer() {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════
+  // Market Overview — S&P 500, NASDAQ, Top Movers
+  // ═══════════════════════════════════════════════════════════════
+  app.get('/api/market-overview', async (req, res) => {
+    try {
+      const indices = ['^GSPC', '^IXIC', '^DJI', '^VIX', '^TNX', 'GC=F', 'CL=F', 'BTC-USD', 'DX-Y.NYB']; // S&P 500, NASDAQ, Dow, VIX, 10Y Treasury, Gold, Oil, Bitcoin, USD Index
+      const topStocks = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA', 'BRK-B', 'JPM', 'V'];
+
+      const [indexQuotes, stockQuotes] = await Promise.all([
+        Promise.all(indices.map(sym => 
+          (yahooFinance.quote(sym) as any).catch(() => null)
+        )),
+        Promise.all(topStocks.map(sym => 
+          (yahooFinance.quote(sym) as any).catch(() => null)
+        )),
+      ]);
+
+      const indicesData = indexQuotes.filter(Boolean).map((q: any) => ({
+        symbol: q.symbol,
+        name: q.shortName || q.longName || q.symbol,
+        price: q.regularMarketPrice,
+        change: q.regularMarketChange,
+        changePercent: q.regularMarketChangePercent,
+      }));
+
+      const movers = stockQuotes.filter(Boolean)
+        .map((q: any) => ({
+          symbol: q.symbol,
+          name: q.shortName || q.symbol,
+          price: q.regularMarketPrice,
+          change: q.regularMarketChange,
+          changePercent: q.regularMarketChangePercent,
+          marketCap: q.marketCap,
+        }))
+        .sort((a: any, b: any) => Math.abs(b.changePercent) - Math.abs(a.changePercent));
+
+      res.json({ indices: indicesData, movers });
+    } catch (error: any) {
+      console.error('Market overview error:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Save report to local data folder
   app.post('/api/save-report', async (req, res) => {
     const { ticker, type, content, report } = req.body;

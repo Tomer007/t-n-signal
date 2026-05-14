@@ -174,6 +174,7 @@ export default function App() {
   const [grahamContent, setGrahamContent] = useState<string>('');
   const [grahamLoading, setGrahamLoading] = useState(false);
   const [apiLogs, setApiLogs] = useState<{ time: string; service: string; status: 'ok' | 'error'; message: string }[]>([]);
+  const [marketOverview, setMarketOverview] = useState<{ indices: any[]; movers: any[] } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -191,6 +192,11 @@ export default function App() {
     document.documentElement.classList.toggle('light', theme === 'light');
     localStorage.setItem('tn-alpha-theme', theme);
   }, [theme]);
+
+  // Fetch market overview on mount
+  useEffect(() => {
+    axios.get('/api/market-overview').then(res => setMarketOverview(res.data)).catch(() => {});
+  }, []);
 
   // Load search history from server on mount (queries only, content loaded lazily on click)
   useEffect(() => {
@@ -216,6 +222,28 @@ export default function App() {
       axios.get('/api/service-status').then(res => setServiceStatuses(res.data?.services || {})).catch(() => {});
     }
   }, [showInfo]);
+
+  // Load persisted API logs when terminal opens (and on mount)
+  useEffect(() => {
+    if (showTerminal || apiLogs.length === 0) {
+      axios.get('/api/activity-logs?days=1').then(res => {
+        if (res.data?.logs?.length) {
+          const serverLogs = res.data.logs.map((l: any) => ({
+            time: l.time || new Date(l.timestamp).toLocaleTimeString(),
+            service: l.service || 'Server',
+            status: l.status || 'ok',
+            message: l.message || '',
+          }));
+          setApiLogs(prev => {
+            // Merge: keep unique by message+time, server logs first
+            const existing = new Set(prev.map(p => p.time + p.message));
+            const newLogs = serverLogs.filter((l: any) => !existing.has(l.time + l.message));
+            return [...newLogs, ...prev].slice(0, 100);
+          });
+        }
+      }).catch(() => {});
+    }
+  }, [showTerminal]);
 
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
@@ -469,6 +497,11 @@ export default function App() {
       ${r.catalysts.map(c => `<li>${c}</li>`).join('\n      ')}
     </ul>
   </div>
+
+  ${grahamContent ? `<div class="card" style="margin-top:24px">
+<h2 style="font-size:14px;text-transform:uppercase;letter-spacing:0.1em;color:#71717a;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:8px">Benjamin Graham Value Analysis</h2>
+<div style="font-size:13px;line-height:1.7;color:#d4d4d8">${formatGrahamMarkdown(grahamContent, true)}</div>
+</div>` : ''}
 
   <div class="footer">
     <p>T&N Signal — Not financial advice. For informational purposes only. Always consult a professional advisor.</p>
@@ -1477,6 +1510,59 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                </motion.div>
             )}
 
+          </motion.div>
+        )}
+
+        {/* Market Overview Widget */}
+        {!currentReport && !analyzeMutation.isPending && marketOverview?.indices?.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-5xl mx-auto px-6 mb-12"
+          >
+            {/* Indices Row */}
+            <div className="grid grid-cols-3 md:grid-cols-9 gap-2 mb-6">
+              {marketOverview.indices.map((idx, i) => {
+                const isUp = idx.changePercent >= 0;
+                const label = idx.symbol === '^GSPC' ? 'S&P 500' : idx.symbol === '^IXIC' ? 'NASDAQ' : idx.symbol === '^DJI' ? 'DOW' : idx.symbol === '^VIX' ? 'VIX' : idx.symbol === '^TNX' ? '10Y Yield' : idx.symbol === 'GC=F' ? 'Gold' : idx.symbol === 'CL=F' ? 'Oil' : idx.symbol === 'BTC-USD' ? 'Bitcoin' : 'USD';
+                return (
+                  <div key={i} className="p-3 bg-zinc-950 border border-zinc-900 rounded-xl text-center widget-hover hover:border-zinc-700 cursor-pointer" onClick={() => { setQuery(idx.symbol); analyzeMutation.mutate(idx.symbol); }}>
+                    <p className="text-[9px] text-zinc-500 uppercase tracking-wider mb-1">{label}</p>
+                    <p className="text-sm font-mono font-bold text-zinc-200">{idx.price?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                    <p className={`text-[10px] font-mono font-bold mt-0.5 ${isUp ? 'text-brand-green' : 'text-brand-coral'}`}>
+                      {isUp ? '▲' : '▼'} {Math.abs(idx.changePercent)?.toFixed(2)}%
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Top Movers */}
+            <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 section-accent flex items-center gap-2 mb-4">
+                <TrendingUp className="h-3.5 w-3.5 text-brand-green" /> Top 10 Movers
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                {(marketOverview.movers || []).slice(0, 10).map((stock, i) => {
+                  const isUp = stock.changePercent >= 0;
+                  return (
+                    <div
+                      key={i}
+                      className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-white/10 cursor-pointer transition-all hover:scale-[1.02]"
+                      onClick={() => { setQuery(stock.symbol); analyzeMutation.mutate(stock.symbol); }}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-mono font-bold text-zinc-200">{stock.symbol}</span>
+                        <span className={`text-[10px] font-mono font-bold ${isUp ? 'text-brand-green' : 'text-brand-coral'}`}>
+                          {isUp ? '+' : ''}{stock.changePercent?.toFixed(2)}%
+                        </span>
+                      </div>
+                      <p className="text-sm font-mono text-zinc-400">${stock.price?.toFixed(2)}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </motion.div>
         )}
 
