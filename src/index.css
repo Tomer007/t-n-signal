@@ -344,3 +344,38 @@ html.light .select-none {
   border-radius: 4px;
   color: #71717a;
 }
+
+/* Sonner toast styling */
+[data-sonner-toaster] [data-sonner-toast] {
+  --normal-bg: #0a0a0a;
+  --normal-border: rgba(255,255,255,0.08);
+  --normal-text: #f5f5f5;
+}
+[data-sonner-toaster] [data-sonner-toast][data-type="success"] {
+  --normal-bg: linear-gradient(135deg, rgba(29,158,117,0.15), rgba(4,44,83,0.9)) !important;
+  background: linear-gradient(135deg, rgba(29,158,117,0.15), rgba(4,44,83,0.9)) !important;
+  border-color: rgba(29,158,117,0.4) !important;
+  color: #d1fae5 !important;
+}
+[data-sonner-toaster] [data-sonner-toast][data-type="error"] {
+  --normal-bg: linear-gradient(135deg, rgba(216,90,48,0.15), rgba(4,44,83,0.9)) !important;
+  background: linear-gradient(135deg, rgba(216,90,48,0.15), rgba(4,44,83,0.9)) !important;
+  border-color: rgba(216,90,48,0.4) !important;
+  color: #fecaca !important;
+}
+[data-sonner-toaster] [data-sonner-toast][data-type="info"] {
+  --normal-bg: linear-gradient(135deg, rgba(24,95,165,0.25), rgba(10,10,30,0.95)) !important;
+  background: linear-gradient(135deg, rgba(24,95,165,0.25), rgba(10,10,30,0.95)) !important;
+  border-color: rgba(24,95,165,0.5) !important;
+  color: #ffffff !important;
+}
+[data-sonner-toaster] [data-sonner-toast][data-type="warning"] {
+  --normal-bg: linear-gradient(135deg, rgba(186,117,23,0.15), rgba(4,44,83,0.9)) !important;
+  background: linear-gradient(135deg, rgba(186,117,23,0.15), rgba(4,44,83,0.9)) !important;
+  border-color: rgba(186,117,23,0.4) !important;
+  color: #fef3c7 !important;
+}
+[data-sonner-toaster] [data-sonner-toast] [data-icon] svg {
+  width: 18px;
+  height: 18px;
+}

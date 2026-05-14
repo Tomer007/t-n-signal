@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { 
@@ -6,7 +6,6 @@ import {
   TrendingUp, 
   CheckCircle2, 
   Download, 
-  Mail, 
   FileText, 
   Loader2,
   BarChart3,
@@ -16,9 +15,7 @@ import {
   Sun,
   Moon,
   Info,
-  X,
-  Share2,
-  ChevronDown
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -46,72 +43,71 @@ import { Toaster, toast } from 'sonner';
 
 import { generateShortReport, generateLongFormReport } from './lib/ai';
 import { AnalysisReport, MarketData } from './types';
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 /** Formats Graham analysis markdown into styled HTML */
 function formatGrahamMarkdown(md: string): string {
-  return md
-    // Tables — convert markdown tables to HTML
-    .replace(/^\|(.+)\|$/gm, (match) => {
-      const cells = match.split('|').filter(c => c.trim());
-      const isHeader = cells.every(c => /^[\s-:]+$/.test(c));
-      if (isHeader) return ''; // skip separator rows
-      const tag = 'td';
-      const cellsHtml = cells.map(c => `<${tag} class="px-3 py-2 border-b border-zinc-800/50 text-xs">${c.trim()}</${tag}>`).join('');
-      return `<tr class="hover:bg-zinc-900/30">${cellsHtml}</tr>`;
-    })
-    // Wrap consecutive <tr> in table
-    .replace(/((<tr[^>]*>.*?<\/tr>\s*)+)/g, '<div class="overflow-x-auto my-4"><table class="w-full border-collapse bg-zinc-900/20 rounded-lg overflow-hidden text-left">$1</table></div>')
-    // Headers
-    .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-black text-white mt-8 mb-3 pb-2 border-b border-zinc-800">$1</h1>')
-    .replace(/^## (.*$)/gm, '<h2 class="text-lg font-bold text-brand-green mt-6 mb-2">$1</h2>')
-    .replace(/^### (.*$)/gm, '<h3 class="text-sm font-semibold text-zinc-200 mt-4 mb-1 uppercase tracking-wide">$1</h3>')
-    // Bold & italic
-    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em class="text-zinc-400">$1</em>')
-    // Blockquotes
-    .replace(/^> (.*$)/gm, '<blockquote class="border-l-3 border-brand-green/60 bg-brand-green/5 pl-4 pr-3 py-2 text-zinc-300 my-3 rounded-r-lg text-sm">$1</blockquote>')
-    // Horizontal rules
-    .replace(/^---$/gm, '<hr class="border-zinc-800 my-6" />')
-    // Status emojis with color
-    .replace(/✅/g, '<span class="text-green-400 font-bold">✅</span>')
-    .replace(/❌/g, '<span class="text-red-400 font-bold">❌</span>')
-    .replace(/⚠️/g, '<span class="text-amber-400 font-bold">⚠️</span>')
-    .replace(/🟢/g, '<span class="text-green-400">🟢</span>')
-    .replace(/🟡/g, '<span class="text-amber-400">🟡</span>')
-    .replace(/🔴/g, '<span class="text-red-400">🔴</span>')
-    .replace(/⭐/g, '<span class="text-yellow-400">⭐</span>')
-    // Line breaks
-    .replace(/\n/g, '<br />');
+  // Process tables first (before line-level replacements)
+  let html = md;
+  
+  // Convert markdown tables to proper HTML tables
+  html = html.replace(/(\|[^\n]+\|\n)((?:\|[-:| ]+\|\n))((?:\|[^\n]+\|\n?)*)/g, (match, headerRow, separator, bodyRows) => {
+    const headers = headerRow.split('|').filter((c: string) => c.trim()).map((c: string) => 
+      `<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#71717a;border-bottom:1px solid rgba(255,255,255,0.1)">${c.trim()}</th>`
+    ).join('');
+    
+    const rows = bodyRows.trim().split('\n').map((row: string) => {
+      const cells = row.split('|').filter((c: string) => c.trim()).map((c: string) => {
+        let content = c.trim();
+        // Color the result cells
+        content = content.replace(/✅/g, '<span style="color:#1D9E75;font-weight:bold">✅</span>');
+        content = content.replace(/❌/g, '<span style="color:#D85A30;font-weight:bold">❌</span>');
+        content = content.replace(/⚠️/g, '<span style="color:#BA7517;font-weight:bold">⚠️</span>');
+        return `<td style="padding:10px 14px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05);color:#d4d4d8">${content}</td>`;
+      }).join('');
+      return `<tr style="transition:background 0.2s" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">${cells}</tr>`;
+    }).join('');
+    
+    return `<div style="overflow-x:auto;margin:16px 0;border-radius:12px;border:1px solid rgba(255,255,255,0.08)"><table style="width:100%;border-collapse:collapse;font-family:inherit"><thead style="background:rgba(255,255,255,0.04)"><tr>${headers}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  });
+
+  // Headers
+  html = html.replace(/^# (.*$)/gm, '<div style="font-size:24px;font-weight:900;color:#f5f5f5;margin:32px 0 12px;padding-bottom:12px;border-bottom:2px solid rgba(29,158,117,0.3)">$1</div>');
+  html = html.replace(/^## (.*$)/gm, '<div style="font-size:17px;font-weight:700;color:#1D9E75;margin:28px 0 10px;display:flex;align-items:center;gap:8px">$1</div>');
+  html = html.replace(/^### (.*$)/gm, '<div style="font-size:14px;font-weight:600;color:#e4e4e7;margin:20px 0 8px">$1</div>');
+
+  // Blockquotes (scores, verdicts)
+  html = html.replace(/^> (.*$)/gm, '<div style="border-left:3px solid #1D9E75;background:rgba(29,158,117,0.08);padding:12px 16px;border-radius:0 10px 10px 0;margin:12px 0;font-weight:600;color:#f5f5f5">$1</div>');
+
+  // Bold & italic
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong style="color:#ffffff;font-weight:700">$1</strong>');
+  html = html.replace(/\*(.*?)\*/g, '<em style="color:#a1a1aa">$1</em>');
+
+  // Horizontal rules
+  html = html.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:24px 0" />');
+
+  // Numbered lists
+  html = html.replace(/^(\d+)\. (.*$)/gm, '<div style="display:flex;gap:10px;margin:6px 0;padding:8px 12px;background:rgba(255,255,255,0.02);border-radius:8px"><span style="color:#1D9E75;font-weight:700;min-width:20px">$1.</span><span style="color:#d4d4d8;font-size:13px">$2</span></div>');
+
+  // Bullet lists
+  html = html.replace(/^- (.*$)/gm, '<div style="display:flex;gap:10px;margin:4px 0;padding:6px 12px"><span style="color:#BA7517">•</span><span style="color:#d4d4d8;font-size:13px">$1</span></div>');
+
+  // Status emojis (outside tables)
+  html = html.replace(/✅/g, '<span style="color:#1D9E75">✅</span>');
+  html = html.replace(/❌/g, '<span style="color:#D85A30">❌</span>');
+  html = html.replace(/⚠️/g, '<span style="color:#BA7517">⚠️</span>');
+  html = html.replace(/🟢/g, '<span style="color:#1D9E75">🟢</span>');
+  html = html.replace(/🟡/g, '<span style="color:#BA7517">🟡</span>');
+  html = html.replace(/🔴/g, '<span style="color:#D85A30">🔴</span>');
+  html = html.replace(/⭐/g, '<span style="color:#BA7517">⭐</span>');
+
+  // Line breaks (only for lines that aren't already HTML)
+  html = html.replace(/\n(?!<)/g, '<br />');
+
+  return html;
 }
 
-/** Service status indicator for the Info modal — checks via /api/service-status endpoint */
-function ServiceStatus({ name, envKey, description, alwaysOn }: { name: string; envKey: string | null; description: string; alwaysOn?: boolean }) {
-  const [status, setStatus] = useState<'checking' | 'ok' | 'missing'>('checking');
-
-  useEffect(() => {
-    if (alwaysOn) {
-      setStatus('ok');
-      return;
-    }
-    axios.get('/api/service-status').then(res => {
-      const services = res.data?.services;
-      if (!services) { setStatus('missing'); return; }
-      // Map envKey to service key
-      const keyMap: Record<string, string> = {
-        'CHATGPT_API_KEY': 'openai',
-        'GNEWS_API_KEY': 'gnews',
-        'NEWS_API_KEY': 'newsapi',
-        'FMP_API_KEY': 'fmp',
-        'FINNHUB_API_KEY': 'finnhub',
-        'FRED_API_KEY': 'fred',
-        'GEMINI_API_KEY': 'gemini',
-      };
-      const serviceKey = envKey ? keyMap[envKey] : null;
-      setStatus(serviceKey && services[serviceKey] ? 'ok' : 'missing');
-    }).catch(() => setStatus('missing'));
-  }, [alwaysOn, envKey]);
-
+/** Service status indicator — receives status from parent */
+function ServiceStatus({ name, description, isConnected, alwaysOn }: { name: string; description: string; isConnected?: boolean; alwaysOn?: boolean }) {
   return (
     <div className="flex items-center justify-between p-3 bg-zinc-900/30 rounded-lg border border-zinc-800/50">
       <div>
@@ -124,12 +120,7 @@ function ServiceStatus({ name, envKey, description, alwaysOn }: { name: string; 
             <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
             Built-in
           </span>
-        ) : status === 'checking' ? (
-          <span className="flex items-center gap-1 text-xs text-zinc-500 font-medium">
-            <span className="h-2 w-2 rounded-full bg-zinc-500 animate-pulse" />
-            Checking...
-          </span>
-        ) : status === 'ok' ? (
+        ) : isConnected ? (
           <span className="flex items-center gap-1 text-xs text-green-400 font-medium">
             <span className="h-2 w-2 rounded-full bg-green-400" />
             Connected
@@ -158,6 +149,8 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [showInfo, setShowInfo] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
+  const [llmCosts, setLlmCosts] = useState<{ totalCost: number; totalRequests: number; todayCost: number; todayRequests: number } | null>(null);
+  const [serviceStatuses, setServiceStatuses] = useState<Record<string, boolean>>({});
   const [isLongForm, setIsLongForm] = useState(false);
   const [currentReport, setCurrentReport] = useState<AnalysisReport | null>(null);
   const [longFormContent, setLongFormContent] = useState<string>('');
@@ -176,6 +169,7 @@ export default function App() {
   const [apiLogs, setApiLogs] = useState<{ time: string; service: string; status: 'ok' | 'error'; message: string }[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tn-alpha-theme');
@@ -208,7 +202,18 @@ export default function App() {
     }).catch(() => {});
   }, []);
 
+  // Fetch LLM costs and service status when info panel opens
+  useEffect(() => {
+    if (showInfo) {
+      axios.get('/api/llm-costs').then(res => setLlmCosts(res.data)).catch(() => {});
+      axios.get('/api/service-status').then(res => setServiceStatuses(res.data?.services || {})).catch(() => {});
+    }
+  }, [showInfo]);
+
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+
+  // Theme-aware button class helper to reduce duplication
+  const ghostBtnClass = theme === 'dark' ? 'text-white/60 hover:text-white hover:bg-white/5' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100';
 
   const addApiLog = (service: string, status: 'ok' | 'error', message: string) => {
     setApiLogs(prev => [{ time: new Date().toLocaleTimeString(), service, status, message }, ...prev].slice(0, 50));
@@ -224,6 +229,7 @@ export default function App() {
       // Create abort controller for cancellation
       const controller = new AbortController();
       setAbortController(controller);
+      abortControllerRef.current = controller;
       
       setLongFormProgress(0);
       setLongFormStep('Fetching market data sampled...');
@@ -250,7 +256,7 @@ export default function App() {
             finalContent = update.content;
           }
           const { report: short, prompt: shortPrompt } = await generateShortReport(marketRes.data, newsRes.data.news, activeQuery);
-          addApiLog('OpenAI', 'ok', `Short report generated — ${currentReport?.recommendation || 'analysis complete'}`);
+          addApiLog('OpenAI', 'ok', `Short report generated — ${short.recommendation}`);
           setCurrentReport(short);
           return { short, long: finalContent };
         } else {
@@ -317,8 +323,9 @@ export default function App() {
           setShowInfo(false);
         } else if (showGuide) {
           setShowGuide(false);
-        } else if (analyzeMutation.isPending && abortController) {
-          abortController.abort();
+        } else if (analyzeMutation.isPending && abortControllerRef.current) {
+          abortControllerRef.current.abort();
+          abortControllerRef.current = null;
           setAbortController(null);
           analyzeMutation.reset();
           setLongFormProgress(0);
@@ -329,76 +336,158 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [zoomedWidget, showGuide, showInfo, analyzeMutation.isPending, abortController]);
+  }, [zoomedWidget, showGuide, showInfo, showTerminal]);
 
   const handleDownloadPDF = async () => {
     if (!currentReport) return;
-    try {
-      const pdfDoc = await PDFDocument.create();
-      const page = pdfDoc.addPage();
-      const { width, height } = page.getSize();
-      
-      // Fill background with Bone color
-      page.drawRectangle({
-        x: 0,
-        y: 0,
-        width,
-        height,
-        color: rgb(241/255, 239/255, 232/255),
-      });
+    const r = currentReport;
+    const recColor = r.recommendation === 'BUY' ? '#1D9E75' : r.recommendation === 'SELL' ? '#D85A30' : '#BA7517';
+    
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${r.ticker} — ${r.recommendation} | T&N Signal Report</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #f5f5f5; padding: 40px; max-width: 800px; margin: 0 auto; line-height: 1.6; }
+  .header { border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 24px; margin-bottom: 32px; }
+  .header .logo { font-size: 11px; color: #71717a; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .header h1 { font-size: 32px; font-weight: 900; margin-bottom: 8px; }
+  .header .meta { font-size: 12px; color: #71717a; }
+  .rec-badge { display: inline-block; background: ${recColor}; color: white; padding: 6px 18px; border-radius: 8px; font-size: 18px; font-weight: 900; margin-top: 12px; }
+  .section { margin-bottom: 28px; }
+  .section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.15em; color: #71717a; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px; }
+  .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; margin-bottom: 12px; }
+  .summary { font-size: 15px; line-height: 1.8; color: #d4d4d8; font-style: italic; border-left: 3px solid ${recColor}; padding-left: 16px; }
+  .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .metric { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 14px; text-align: center; }
+  .metric .value { font-size: 18px; font-weight: 800; color: white; }
+  .metric .label { font-size: 10px; color: #71717a; text-transform: uppercase; margin-top: 4px; }
+  .gauge { margin: 12px 0; }
+  .gauge-bar { height: 10px; border-radius: 5px; background: #1a1a2e; overflow: hidden; }
+  .gauge-fill { height: 100%; border-radius: 5px; }
+  .gauge-label { display: flex; justify-content: space-between; font-size: 11px; color: #71717a; margin-top: 4px; }
+  .swot { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .swot-cell { border-radius: 10px; padding: 14px; }
+  .swot-cell h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 8px; }
+  .swot-cell ul { list-style: none; padding: 0; }
+  .swot-cell li { font-size: 12px; color: #d4d4d8; margin-bottom: 4px; padding-left: 12px; position: relative; }
+  .swot-cell li::before { content: "•"; position: absolute; left: 0; }
+  .strengths { background: rgba(29,158,117,0.08); border: 1px solid rgba(29,158,117,0.2); }
+  .strengths h4 { color: #1D9E75; }
+  .weaknesses { background: rgba(216,90,48,0.08); border: 1px solid rgba(216,90,48,0.2); }
+  .weaknesses h4 { color: #D85A30; }
+  .opportunities { background: rgba(24,95,165,0.08); border: 1px solid rgba(24,95,165,0.2); }
+  .opportunities h4 { color: #185FA5; }
+  .threats { background: rgba(186,117,23,0.08); border: 1px solid rgba(186,117,23,0.2); }
+  .threats h4 { color: #BA7517; }
+  .targets { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; text-align: center; }
+  .targets .price { font-size: 28px; font-weight: 900; }
+  .targets .price-label { font-size: 10px; color: #71717a; text-transform: uppercase; }
+  .catalysts li { font-size: 13px; color: #d4d4d8; margin-bottom: 8px; padding-left: 20px; position: relative; }
+  .catalysts li::before { content: "⚡"; position: absolute; left: 0; }
+  .exec-points li { font-size: 13px; color: #d4d4d8; margin-bottom: 8px; padding-left: 20px; position: relative; }
+  .exec-points li::before { content: "✓"; position: absolute; left: 0; color: #1D9E75; font-weight: bold; }
+  .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.08); text-align: center; font-size: 10px; color: #52525b; }
+  @media print { body { background: white; color: #1a1a1a; } .card { border-color: #e4e4e7; } .metric { border-color: #e4e4e7; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">T&N Signal — Equity Research</div>
+    <h1>${r.ticker}</h1>
+    <div class="meta">Generated ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} • Confidence: ${r.confidence}%</div>
+    <div class="rec-badge">${r.recommendation}</div>
+  </div>
 
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  <div class="section">
+    <h2>Executive Summary</h2>
+    <div class="card">
+      <p class="summary">${r.summary}</p>
+    </div>
+    <ul class="exec-points" style="list-style:none; margin-top:12px;">
+      ${r.executiveSummary.points.map(p => `<li>${p}</li>`).join('\n      ')}
+    </ul>
+  </div>
 
-      let yPos = height - 60;
-      // Navy Header
-      page.drawText(`T&N SIGNAL: EQUITY RESEARCH`, { 
-        x: 50, 
-        y: yPos, 
-        size: 24, 
-        font: boldFont, 
-        color: rgb(4/255, 44/255, 83/255) 
-      });
-      yPos -= 25;
-      page.drawText(`Ticker: ${currentReport.ticker}`, { x: 50, y: yPos, size: 12, font: boldFont, color: rgb(24/255, 95/255, 165/255) });
-      yPos -= 20;
-      page.drawText(`Date: ${new Date().toLocaleDateString()}`, { x: 50, y: yPos, size: 10, font, color: rgb(100/255, 100/255, 100/255) });
-      yPos -= 40;
+  <div class="section">
+    <h2>Key Metrics</h2>
+    <div class="metrics-grid">
+      ${r.metrics.map(m => `<div class="metric"><div class="value" style="color:${m.status === 'positive' ? '#1D9E75' : m.status === 'negative' ? '#D85A30' : '#f5f5f5'}">${m.value}</div><div class="label">${m.label}</div></div>`).join('\n      ')}
+    </div>
+  </div>
 
-      // Recommendation with Brand Green/Coral
-      const recColor = currentReport.recommendation === 'BUY' ? rgb(29/255, 158/255, 117/255) : 
-                       currentReport.recommendation === 'SELL' ? rgb(216/255, 90/255, 48/255) :
-                       rgb(186/255, 117/255, 23/255);
+  <div class="section">
+    <h2>Market Sentiment</h2>
+    <div class="card">
+      <div class="gauge">
+        <div class="gauge-bar"><div class="gauge-fill" style="width:${r.sentimentScore}%; background: linear-gradient(90deg, #D85A30, #BA7517, #1D9E75);"></div></div>
+        <div class="gauge-label"><span>Bearish</span><span>${r.sentimentScore}/100</span><span>Bullish</span></div>
+      </div>
+    </div>
+  </div>
 
-      page.drawText('VERDICT: ' + currentReport.recommendation, { x: 50, y: yPos, size: 18, font: boldFont, color: recColor });
-      yPos -= 40;
-      
-      const lines = currentReport.summary.match(/.{1,90}/g) || [];
-      for (const line of lines) {
-        if (yPos < 60) break;
-        page.drawText(line, { x: 50, y: yPos, size: 11, font, color: rgb(0,0,0) });
-        yPos -= 18;
-      }
+  <div class="section">
+    <h2>Risk Profile</h2>
+    <div class="card">
+      <div class="gauge">
+        <div class="gauge-bar"><div class="gauge-fill" style="width:${r.riskScore}%; background: linear-gradient(90deg, #1D9E75, #BA7517, #D85A30);"></div></div>
+        <div class="gauge-label"><span>Low Risk</span><span>${r.riskScore}/100</span><span>High Risk</span></div>
+      </div>
+    </div>
+  </div>
 
-      // Footer
-      page.drawText('NOT FINANCIAL ADVICE. GENERATED BY T&N SIGNAL.', {
-        x: 50,
-        y: 30,
-        size: 8,
-        font,
-        color: rgb(150/255, 150/255, 150/255)
-      });
+  <div class="section">
+    <h2>SWOT Analysis</h2>
+    <div class="swot">
+      <div class="swot-cell strengths"><h4>Strengths</h4><ul>${r.swot.strengths.map(s => `<li>${s}</li>`).join('')}</ul></div>
+      <div class="swot-cell weaknesses"><h4>Weaknesses</h4><ul>${r.swot.weaknesses.map(s => `<li>${s}</li>`).join('')}</ul></div>
+      <div class="swot-cell opportunities"><h4>Opportunities</h4><ul>${r.swot.opportunities.map(s => `<li>${s}</li>`).join('')}</ul></div>
+      <div class="swot-cell threats"><h4>Threats</h4><ul>${r.swot.threats.map(s => `<li>${s}</li>`).join('')}</ul></div>
+    </div>
+  </div>
 
-      const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
+  <div class="section">
+    <h2>Price Targets</h2>
+    <div class="card">
+      <div class="targets">
+        <div><div class="price" style="color:#1D9E75">${r.priceTargets.entry}</div><div class="price-label">Entry Target</div></div>
+        <div><div class="price" style="color:#185FA5">${r.priceTargets.exit}</div><div class="price-label">Exit Target</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Key Catalysts</h2>
+    <ul class="catalysts" style="list-style:none;">
+      ${r.catalysts.map(c => `<li>${c}</li>`).join('\n      ')}
+    </ul>
+  </div>
+
+  <div class="footer">
+    <p>T&N Signal — Not financial advice. For informational purposes only. Always consult a professional advisor.</p>
+    <p style="margin-top:4px;">Build v1.0.0 • ${new Date().toISOString().split('T')[0]}</p>
+  </div>
+</body>
+</html>`;
+
+    // Open in new tab for print-to-PDF
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      toast.success('Report opened — use Ctrl+P / ⌘P to save as PDF');
+    } else {
+      // Fallback: download as HTML file
+      const blob = new Blob([html], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${currentReport.ticker}_Report.pdf`;
+      link.download = `${r.ticker}_Report.html`;
       link.click();
       URL.revokeObjectURL(url);
-    } catch (e) {
-      toast.error('Failed to generate PDF');
+      toast.success('Report downloaded as HTML');
     }
   };
 
@@ -595,37 +684,25 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
     }
   };
 
-  const handleHebrewInfographic = async () => {
-    if (!currentReport) return;
-    toast.info('מייצר אינפוגרפיקה בעברית... (עד 15 שניות)');
-    try {
-      const res = await axios.post('/api/hebrew-infographic', {
-        report: currentReport,
-        ticker: currentReport.ticker,
-      }, { timeout: 70000 });
-      if (res.data?.html) {
-        const win = window.open('', '_blank');
-        if (win) {
-          win.document.write(res.data.html);
-          win.document.close();
-          toast.success('אינפוגרפיקה נוצרה בהצלחה!');
-        }
-      } else {
-        toast.error('Failed to generate infographic');
-      }
-    } catch (err: any) {
-      const msg = err.response?.data?.error || err.message;
-      if (err.response?.status === 429 || msg.includes('rate limit')) {
-        toast.error('Gemini rate limit — wait 30 seconds and try again');
-      } else {
-        toast.error(msg || 'Gemini API error');
-      }
-    }
-  };
-
   return (
     <div className={`min-h-screen font-sans selection:bg-orange-500/30 flex ${theme === 'dark' ? 'bg-[#050505] text-zinc-100' : 'bg-white text-zinc-900'}`}>
-      <Toaster position="top-center" theme={theme} />
+      <Toaster 
+        position="bottom-center" 
+        theme={theme}
+        toastOptions={{
+          style: {
+            background: theme === 'dark' ? '#0a0a0a' : '#ffffff',
+            border: theme === 'dark' ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e4e4e7',
+            borderRadius: '14px',
+            padding: '14px 20px',
+            fontSize: '13px',
+            fontWeight: '500',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+          },
+          className: 'font-sans',
+        }}
+        gap={8}
+      />
       
       {/* Research Vault Sidebar */}
       <motion.aside 
@@ -696,7 +773,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
               size="icon" 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               aria-label="Toggle research history sidebar"
-              className={theme === 'dark' ? 'text-white/60 hover:text-white hover:bg-white/5' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'}
+              className={ghostBtnClass}
             >
               <BarChart3 className="h-5 w-5" />
             </Button>
@@ -711,7 +788,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                variant="ghost"
                size="icon"
                onClick={() => setShowInfo(true)}
-               className={theme === 'dark' ? 'text-white/60 hover:text-white hover:bg-white/5' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'}
+               className={ghostBtnClass}
                title="App Info & Version"
              >
                <Info className="h-4 w-4" />
@@ -720,7 +797,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                variant="ghost"
                size="icon"
                onClick={() => setShowGuide(true)}
-               className={theme === 'dark' ? 'text-white/60 hover:text-white hover:bg-white/5' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'}
+               className={ghostBtnClass}
                title="User Guide"
              >
                <BookOpen className="h-4 w-4" />
@@ -729,7 +806,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                variant="ghost"
                size="icon"
                onClick={toggleTheme}
-               className={theme === 'dark' ? 'text-white/60 hover:text-white hover:bg-white/5' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'}
+               className={ghostBtnClass}
                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
              >
                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -786,7 +863,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                   </div>
                   <Input 
                     ref={searchInputRef}
-                    className={`h-16 pl-3 pr-4 bg-transparent border-none focus:ring-0 text-xl font-medium ${theme === 'dark' ? 'placeholder:text-white/20 text-white' : 'placeholder:text-zinc-400 text-zinc-900'}`}
+                    className={`h-16 pl-3 pr-4 bg-transparent border-none focus:ring-0 focus:outline-none focus-visible:outline-none shadow-none text-xl font-medium ${theme === 'dark' ? 'placeholder:text-white/20 text-white' : 'placeholder:text-zinc-400 text-zinc-900'}`}
                     placeholder={history.length > 0 ? `Last: ${history[0]} — or type new...` : "Ticker or sector..."}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
@@ -797,10 +874,11 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                       <Button 
                         onClick={() => {
                           // Actually cancel the network requests
-                          if (abortController) {
-                            abortController.abort();
-                            setAbortController(null);
+                          if (abortControllerRef.current) {
+                            abortControllerRef.current.abort();
+                            abortControllerRef.current = null;
                           }
+                          setAbortController(null);
                           analyzeMutation.reset();
                           setLongFormProgress(0);
                           setLongFormStep('');
@@ -833,29 +911,37 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                   />
                   <label htmlFor="long-form" className="text-sm font-semibold text-white/70 cursor-pointer flex items-center gap-2 select-none">
                     <BookOpen className="h-4 w-4 text-brand-blue" />
-                    Long-Form Research
+                    Deep Research
                   </label>
                 </div>
-                <span className="hidden md:flex items-center gap-1.5 text-zinc-600 text-xs">
-                  <span className="kbd">⌘K</span> to focus
-                </span>
               </div>
             </motion.div>
 
-            <div className="flex flex-wrap justify-center gap-2 mt-12">
-              <span className="text-xs text-zinc-500 font-medium py-1">Try:</span>
-              {['ZPRV.DE', 'HVE.L', 'MLPA', 'XRS2.DE', 'IB01.L', 'EIMI.L', 'O', 'LB', 'BEPC', 'CNQ', 'PFF', 'KNG', 'BOAT', 'AGGU.L', 'RQI', 'PDI', 'PDO', 'ETG', 'MLPT', 'ZAUI', 'PTY', 'URNU.L', 'TSLA', 'NVDA'].map(t => (
-                <button 
-                  key={t}
-                  onClick={() => {
-                    setQuery(t);
-                    analyzeMutation.mutate(t);
-                  }}
-                  className="text-xs text-zinc-400 hover:text-orange-400 hover:bg-orange-500/10 px-3 py-1.5 rounded-lg border border-zinc-900 transition-all active:scale-95"
-                >
-                  {t}
-                </button>
-              ))}
+            <div className="flex flex-wrap justify-center gap-2 mt-12 max-w-3xl mx-auto">
+              <span className={`text-xs font-bold uppercase tracking-wider py-1.5 px-2 ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>Popular:</span>
+              {['ZPRV.DE', 'HVE.L', 'MLPA', 'XRS2.DE', 'IB01.L', 'EIMI.L', 'O', 'LB', 'BEPC', 'CNQ', 'PFF', 'KNG', 'BOAT', 'AGGU.L', 'RQI', 'PDI', 'PDO', 'ETG', 'MLPT', 'ZAUI', 'PTY', 'URNU.L', 'TSLA', 'NVDA'].map((t, i) => {
+                const colors = ['#185FA5', '#1D9E75', '#BA7517', '#D85A30'];
+                const color = colors[i % colors.length];
+                return (
+                  <button 
+                    key={t}
+                    onClick={() => {
+                      setQuery(t);
+                      analyzeMutation.mutate(t);
+                    }}
+                    className="text-xs font-mono font-medium px-3 py-1.5 rounded-lg border transition-all active:scale-95 hover:scale-105"
+                    style={{ 
+                      color: theme === 'dark' ? `${color}cc` : color,
+                      borderColor: theme === 'dark' ? `${color}30` : `${color}40`,
+                      backgroundColor: theme === 'dark' ? `${color}08` : `${color}08`,
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = `${color}20`; e.currentTarget.style.borderColor = `${color}60`; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = `${color}08`; e.currentTarget.style.borderColor = theme === 'dark' ? `${color}30` : `${color}40`; }}
+                  >
+                    {t}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -997,10 +1083,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" onClick={handleDownloadPDF} className="border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white">
-                  <Download className="h-4 w-4 mr-2" /> EXPORT PDF
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleHebrewInfographic} className="border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white">
-                  🇮🇱 אינפוגרפיקה
+                  <Download className="h-4 w-4 mr-2" /> EXPORT REPORT
                 </Button>
                 {isLongForm && (
                   <Button size="sm" onClick={downloadMarkdown} className="bg-orange-600 hover:bg-orange-500 text-white font-bold">
@@ -1047,30 +1130,33 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                     <TrendingUp className="h-4 w-4 text-zinc-600" />
                   </div>
                   <div className="h-[230px] w-full pt-4 pr-2">
-                    {marketData?.history && (
+                    {marketData?.history && marketData.history.length > 0 && (
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={marketData.history}>
                           <defs>
                             <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#ea580c" stopOpacity={0.2}/>
-                              <stop offset="95%" stopColor="#ea580c" stopOpacity={0}/>
+                              <stop offset="5%" stopColor="#1D9E75" stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor="#1D9E75" stopOpacity={0}/>
                             </linearGradient>
                           </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#18181b" vertical={false} />
+                          <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#18181b' : '#e4e4e7'} vertical={false} />
                           <XAxis 
                             dataKey="date" 
-                            stroke="#3f3f46" 
+                            stroke={theme === 'dark' ? '#3f3f46' : '#a1a1aa'} 
                             fontSize={10} 
                             tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short' })}
                           />
-                          <YAxis stroke="#3f3f46" fontSize={10} domain={['auto', 'auto']} hide />
+                          <YAxis stroke={theme === 'dark' ? '#3f3f46' : '#a1a1aa'} fontSize={10} domain={['auto', 'auto']} hide />
                           <ReChartsTooltip 
-                            contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px', fontSize: '12px' }}
-                            itemStyle={{ color: '#ea580c' }}
+                            contentStyle={{ backgroundColor: theme === 'dark' ? '#09090b' : '#ffffff', border: `1px solid ${theme === 'dark' ? '#27272a' : '#e4e4e7'}`, borderRadius: '12px', fontSize: '12px' }}
+                            itemStyle={{ color: '#1D9E75' }}
                           />
-                          <Area type="monotone" dataKey="close" stroke="#ea580c" fillOpacity={1} fill="url(#colorPrice)" strokeWidth={2} />
+                          <Area type="monotone" dataKey="close" stroke="#1D9E75" fillOpacity={1} fill="url(#colorPrice)" strokeWidth={2} />
                         </AreaChart>
                       </ResponsiveContainer>
+                    )}
+                    {(!marketData?.history || marketData.history.length === 0) && (
+                      <div className="h-full flex items-center justify-center text-zinc-500 text-sm">No price data available</div>
                     )}
                   </div>
                 </CardContent>
@@ -1150,31 +1236,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                 </CardContent>
               </Card>
 
-              {/* Verdict Card - Bento Span */}
-              <Card className="lg:col-span-2 bg-brand-navy border border-white/10 shadow-2xl shadow-brand-navy/40 text-white relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-8 transform translate-x-4 -translate-y-4 opacity-10 group-hover:translate-x-0 group-hover:translate-y-0 transition-transform duration-700">
-                   <Zap className="h-40 w-40 text-brand-blue" />
-                </div>
-                <CardContent className="p-10 relative z-10 flex flex-col md:flex-row items-center gap-10">
-                   <div className="text-center md:text-left space-y-2">
-                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-blue">Final Verdict</p>
-                     <p className="text-[8px] text-white/40 max-w-[200px]">AI recommendation based on fundamentals, sentiment, and risk analysis. BUY/HOLD/SELL/WATCH.</p>
-                     <h3 className={`text-8xl font-black italic transform -skew-x-6 ${
-                        currentReport.recommendation === 'BUY' ? 'text-brand-green' : currentReport.recommendation === 'SELL' ? 'text-brand-coral' : 'text-brand-amber'
-                     }`}>{currentReport.recommendation}</h3>
-                   </div>
-                   <div className="flex-1 grid grid-cols-2 gap-8 border-l border-white/10 pl-10">
-                      <div>
-                        <p className="text-[10px] font-black uppercase text-white/30 mb-1 leading-none">Entry Target</p>
-                        <p className="text-3xl font-mono font-bold leading-none text-brand-green">{currentReport.priceTargets.entry}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black uppercase text-white/30 mb-1 leading-none">Exit Target</p>
-                        <p className="text-3xl font-mono font-bold leading-none text-brand-blue">{currentReport.priceTargets.exit}</p>
-                      </div>
-                   </div>
-                </CardContent>
-              </Card>
+              {/* Metrics removed from bento - verdict moved above */}
 
             </div>
 
@@ -1305,24 +1367,33 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
               </CardContent>
             </Card>
 
-            {/* Used Prompt — Copyable */}
+            {/* Used Prompt — Collapsed by default */}
             {activePrompt && (
               <Card className="bg-zinc-950 border-zinc-900">
-                <CardHeader className="flex flex-row items-center justify-between p-6 pb-0">
-                  <CardTitle className="text-sm font-bold uppercase tracking-widest text-zinc-500">Used Prompt</CardTitle>
+                <CardHeader 
+                  className="flex flex-row items-center justify-between p-6 cursor-pointer hover:bg-zinc-900/30 transition-colors rounded-t-xl"
+                  onClick={() => {
+                    const el = document.getElementById('prompt-content');
+                    if (el) el.classList.toggle('hidden');
+                  }}
+                >
+                  <CardTitle className="text-sm font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                    <span className="text-zinc-600">▶</span> Used Prompt
+                  </CardTitle>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       navigator.clipboard.writeText(activePrompt);
                       toast.success('Prompt copied to clipboard!');
                     }}
                     className="border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white text-xs"
                   >
-                    📋 Copy Prompt
+                    📋 Copy
                   </Button>
                 </CardHeader>
-                <CardContent className="p-6 pt-4">
+                <CardContent id="prompt-content" className="p-6 pt-0 hidden">
                   <pre className="text-xs text-zinc-500 font-mono whitespace-pre-wrap leading-relaxed max-h-[300px] overflow-y-auto bg-black/30 p-4 rounded-lg border border-zinc-900 select-all">
                     {activePrompt}
                   </pre>
@@ -1374,43 +1445,78 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                </motion.div>
             )}
 
-            <footer className="pt-32 pb-20 border-t border-zinc-900/50">
-               <div className="flex flex-col items-center gap-6 max-w-2xl mx-auto text-center">
-                 <div className="h-10 w-10 bg-zinc-900 rounded-full flex items-center justify-center">
-                   <ShieldCheck className="h-5 w-5 text-zinc-600" />
-                 </div>
-                 <p className="text-[10px] uppercase tracking-[0.5em] font-black text-zinc-500">Legal Disclaimer</p>
-                 <p className="text-xs text-zinc-700 italic leading-relaxed">
-                   T&N SIGNAL IS AN AI-DRIVEN RESEARCH TOOL. ALL INFORMATION IS GENERATED BY LARGE LANGUAGE MODELS AND THIRD-PARTY MARKET PROVIDERS. THIS DOES NOT CONSTITUTE FINANCIAL ADVICE. ALWAYS CONSULT A PROFESSIONAL ADVISOR BEFORE ALLOCATING CAPITAL.
-                 </p>
-                 <p className="text-[10px] text-zinc-800 font-mono">Build v2.0.4 // GPT-4o Core</p>
-               </div>
-            </footer>
           </motion.div>
         )}
 
-        {/* Empty State Features */}
+        {/* Empty State — How It Works */}
         {!currentReport && !analyzeMutation.isPending && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 pb-32"
+            className="max-w-5xl mx-auto px-6 pb-32"
           >
-            {[
-              { icon: TrendingUp, title: "Market Alpha", desc: "Real-time pricing delta and sector-relative performance scores." },
-              { icon: ShieldCheck, title: "Risk Safeguard", desc: "Proprietary volatility stress-testing and leverage sensitivity analysis." },
-              { icon: Mail, title: "Vault Sync", desc: "Save your favorite analyses for live updates and multi-device access." }
-            ].map((f, i) => (
-              <Card key={i} className="bg-zinc-950 border-zinc-900 hover:border-orange-500/20 transition-all group cursor-default">
-                <CardHeader className="p-8">
-                  <f.icon className="h-10 w-10 text-zinc-700 mb-6 group-hover:text-orange-500 group-hover:scale-110 transition-all duration-500" />
-                  <CardTitle className="text-lg font-bold mb-2">{f.title}</CardTitle>
-                  <CardDescription className="text-zinc-500 text-sm leading-relaxed">{f.desc}</CardDescription>
-                </CardHeader>
-              </Card>
-            ))}
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center gap-3 px-5 py-2 rounded-full bg-brand-green/10 border border-brand-green/20 mb-4">
+                <Zap className="h-3.5 w-3.5 text-brand-green" />
+                <span className="text-xs font-bold text-brand-green uppercase tracking-wider">How It Works</span>
+              </div>
+              <p className={`text-sm max-w-md mx-auto ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>Three steps from ticker to institutional-grade research</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                { icon: Search, step: "1", title: "Search Any Ticker", desc: "Enter a stock symbol, ETF, or sector. We pull real-time data from Yahoo Finance, FMP, and Finnhub.", color: "#185FA5", gradient: "from-blue-500/10 to-transparent" },
+                { icon: Zap, step: "2", title: "AI Deep Analysis", desc: "Our AI engine combines market data, news, insider trades, and financials to generate a professional research report in seconds.", color: "#1D9E75", gradient: "from-green-500/10 to-transparent" },
+                { icon: ShieldCheck, step: "3", title: "Actionable Insights", desc: "Get a BUY/HOLD/SELL verdict, SWOT matrix, price targets, Graham valuation, and exportable research reports.", color: "#D85A30", gradient: "from-orange-500/10 to-transparent" },
+              ].map((f, i) => (
+                <Card key={i} className={`bg-zinc-950 border-zinc-900 hover:border-zinc-700 transition-all group cursor-default relative overflow-hidden`}>
+                  <div className={`absolute inset-0 bg-gradient-to-b ${f.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+                  <div className="absolute top-4 right-4 text-5xl font-black transition-colors" style={{ color: `${f.color}15` }}>{f.step}</div>
+                  <CardHeader className="p-8 relative z-10">
+                    <div className="h-12 w-12 rounded-xl flex items-center justify-center mb-5 transition-all duration-300" style={{ backgroundColor: `${f.color}15`, border: `1px solid ${f.color}30` }}>
+                      <f.icon className="h-6 w-6 transition-all duration-300" style={{ color: f.color }} />
+                    </div>
+                    <CardTitle className="text-base font-bold mb-2">{f.title}</CardTitle>
+                    <CardDescription className="text-zinc-500 text-sm leading-relaxed">{f.desc}</CardDescription>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+            <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              {[
+                { label: "Data Sources", value: "7+", color: "#185FA5", url: "https://finance.yahoo.com" },
+                { label: "Analysis Time", value: "~8s", color: "#1D9E75", url: null },
+                { label: "Frameworks", value: "Graham + AI", color: "#BA7517", url: "https://en.wikipedia.org/wiki/Benjamin_Graham" },
+                { label: "Export Formats", value: "HTML, MD", color: "#D85A30", url: null },
+              ].map((stat, i) => (
+                stat.url ? (
+                  <a key={i} href={stat.url} target="_blank" rel="noopener noreferrer" className="p-5 bg-zinc-900/30 rounded-xl border border-zinc-800/50 hover:border-zinc-700 transition-all group cursor-pointer">
+                    <p className="text-xl font-black transition-colors" style={{ color: stat.color }}>{stat.value}</p>
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1 group-hover:text-zinc-400 transition-colors">{stat.label} ↗</p>
+                  </a>
+                ) : (
+                  <div key={i} className="p-5 bg-zinc-900/30 rounded-xl border border-zinc-800/50 hover:border-zinc-700 transition-all group cursor-pointer" onClick={() => { if (stat.label === 'Analysis Time') toast.info('Average time for a standard report generation'); else toast.info('Export your report as HTML or Markdown for NotebookLM'); }}>
+                    <p className="text-xl font-black transition-colors" style={{ color: stat.color }}>{stat.value}</p>
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1 group-hover:text-zinc-400 transition-colors">{stat.label}</p>
+                  </div>
+                )
+              ))}
+            </div>
           </motion.div>
         )}
+
+        {/* Footer — always visible */}
+        <footer className="pt-16 pb-10 px-6 border-t border-zinc-800 mt-auto">
+          <div className="flex flex-col items-center gap-3 max-w-2xl mx-auto text-center">
+            <div className="h-8 w-8 bg-zinc-900 rounded-full flex items-center justify-center">
+              <ShieldCheck className="h-4 w-4 text-zinc-500" />
+            </div>
+            <p className="text-[10px] uppercase tracking-[0.3em] font-bold text-zinc-500">Legal Disclaimer</p>
+            <p className="text-xs text-zinc-500 italic leading-relaxed max-w-lg">
+              T&N Signal is an AI-driven research tool. All information is generated by large language models and third-party market providers. This does not constitute financial advice. Always consult a professional advisor before allocating capital.
+            </p>
+            <p className="text-[11px] text-zinc-600 font-mono mt-1">Build v{APP_VERSION}</p>
+          </div>
+        </footer>
       </main>
 
       {/* User Guide Modal */}
@@ -1439,7 +1545,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                   <h3 className="text-lg font-bold text-white mb-2">Getting Started</h3>
                   <ol className="list-decimal pl-5 space-y-2">
                     <li>Type a <strong>ticker</strong> (TSLA, NVDA, AGGU.L) or <strong>sector</strong> (EV Sector) in the search bar</li>
-                    <li>Optionally check <strong>Long-Form Research</strong> for a full institutional report</li>
+                    <li>Optionally check <strong>Deep Research</strong> for a full institutional report</li>
                     <li>Click <strong>GENERATE</strong> and wait for the AI analysis</li>
                     <li>Review the dashboard — click any widget to zoom in</li>
                   </ol>
@@ -1488,89 +1594,120 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
         )}
       </AnimatePresence>
 
-      {/* App Info Modal */}
+      {/* App Info — Slide-in Sidebar */}
       <AnimatePresence>
         {showInfo && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-            onClick={() => setShowInfo(false)}
-          >
+          <>
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-md m-4 p-8 shadow-2xl"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[190] bg-black/40 backdrop-blur-sm"
+              onClick={() => setShowInfo(false)}
+            />
+            <motion.aside
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className={`fixed top-0 right-0 h-screen w-[340px] z-[200] border-l overflow-y-auto flex flex-col ${theme === 'dark' ? 'bg-brand-navy border-white/10' : 'bg-white border-zinc-200'}`}
             >
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-black text-white flex items-center gap-2">
-                  <div className="h-8 w-8 bg-brand-green rounded-lg flex items-center justify-center">
-                    <Zap className="h-5 w-5 text-white" />
+              {/* Header */}
+              <div className="p-6 border-b border-white/10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 bg-brand-green rounded-lg flex items-center justify-center">
+                      <Zap className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-black text-white">T&N Signal</h2>
+                      <p className="text-[10px] text-zinc-500 font-mono">v{APP_VERSION}</p>
+                    </div>
                   </div>
-                  T&N Signal
-                </h2>
-                <Button variant="ghost" size="sm" onClick={() => setShowInfo(false)} className="text-zinc-400 hover:text-white">
-                  <X className="h-4 w-4" />
-                </Button>
+                  <Button variant="ghost" size="icon" onClick={() => setShowInfo(false)} className="text-zinc-400 hover:text-white hover:bg-white/5 h-8 w-8">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
 
-              <div className="space-y-5">
-                {/* Version */}
-                <div className="flex items-center justify-between p-3 bg-zinc-900/50 rounded-lg border border-zinc-800">
-                  <span className="text-sm text-zinc-400">Version</span>
-                  <span className="text-sm font-mono font-bold text-white">{APP_VERSION}</span>
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+                {/* LLM Cost Tracker */}
+                <div>
+                  <h3 className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-3">LLM Usage & Cost</h3>
+                  {llmCosts ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="p-3 bg-white/5 rounded-xl border border-white/5 text-center">
+                        <p className="text-lg font-black text-white">${llmCosts.totalCost.toFixed(4)}</p>
+                        <p className="text-[9px] text-zinc-500 uppercase mt-0.5">Total (30d)</p>
+                      </div>
+                      <div className="p-3 bg-white/5 rounded-xl border border-white/5 text-center">
+                        <p className="text-lg font-black text-white">${llmCosts.todayCost.toFixed(4)}</p>
+                        <p className="text-[9px] text-zinc-500 uppercase mt-0.5">Today</p>
+                      </div>
+                      <div className="p-3 bg-white/5 rounded-xl border border-white/5 text-center">
+                        <p className="text-lg font-black text-brand-green">{llmCosts.totalRequests}</p>
+                        <p className="text-[9px] text-zinc-500 uppercase mt-0.5">Total Requests</p>
+                      </div>
+                      <div className="p-3 bg-white/5 rounded-xl border border-white/5 text-center">
+                        <p className="text-lg font-black text-brand-blue">{llmCosts.todayRequests}</p>
+                        <p className="text-[9px] text-zinc-500 uppercase mt-0.5">Today Requests</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-zinc-600 text-center py-3">Loading...</p>
+                  )}
                 </div>
 
-                {/* External Services */}
+                {/* Connected Services */}
                 <div>
-                  <h3 className="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-3">Connected Services</h3>
-                  <div className="space-y-2">
-                    <ServiceStatus name="OpenAI (GPT)" envKey="CHATGPT_API_KEY" description="AI analysis engine" />
-                    <ServiceStatus name="GNews" envKey="GNEWS_API_KEY" description="Business news feed" />
-                    <ServiceStatus name="NewsAPI" envKey="NEWS_API_KEY" description="Global news aggregator" />
-                    <ServiceStatus name="Financial Modeling Prep" envKey="FMP_API_KEY" description="Fundamentals & financials" />
-                    <ServiceStatus name="Finnhub" envKey="FINNHUB_API_KEY" description="Insider trades & sentiment" />
-                    <ServiceStatus name="FRED" envKey="FRED_API_KEY" description="Macro data & bond yields" />
-                    <ServiceStatus name="Gemini" envKey="GEMINI_API_KEY" description="Hebrew infographic generation" />
-                    <ServiceStatus name="Yahoo Finance" envKey={null} description="Market data & quotes" alwaysOn />
+                  <h3 className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-3">Connected Services</h3>
+                  <div className="space-y-1.5">
+                    <ServiceStatus name="OpenAI (GPT)" description="AI analysis engine" isConnected={serviceStatuses.openai} />
+                    <ServiceStatus name="GNews" description="Business news feed" isConnected={serviceStatuses.gnews} />
+                    <ServiceStatus name="NewsAPI" description="Global news aggregator" isConnected={serviceStatuses.newsapi} />
+                    <ServiceStatus name="Financial Modeling Prep" description="Fundamentals & financials" isConnected={serviceStatuses.fmp} />
+                    <ServiceStatus name="Finnhub" description="Insider trades & sentiment" isConnected={serviceStatuses.finnhub} />
+                    <ServiceStatus name="FRED" description="Macro data & bond yields" isConnected={serviceStatuses.fred} />
+                    <ServiceStatus name="Gemini" description="Hebrew infographic (fallback)" isConnected={serviceStatuses.gemini} />
+                    <ServiceStatus name="Yahoo Finance" description="Market data & quotes" alwaysOn />
                   </div>
                 </div>
 
-                {/* News Sources */}
+                {/* News & Data Sources */}
                 <div>
-                  <h3 className="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-3">News & Data Sources</h3>
-                  <div className="grid grid-cols-2 gap-2">
+                  <h3 className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-3">Data Sources</h3>
+                  <div className="space-y-1">
                     {[
                       { name: 'Yahoo Finance', url: 'https://finance.yahoo.com' },
                       { name: 'GNews.io', url: 'https://gnews.io' },
                       { name: 'NewsAPI.org', url: 'https://newsapi.org' },
                       { name: 'SEC EDGAR', url: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany' },
+                      { name: 'FRED Economic Data', url: 'https://fred.stlouisfed.org' },
                     ].map(s => (
                       <a
                         key={s.name}
                         href={s.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 p-2.5 bg-zinc-900/30 border border-zinc-800/50 rounded-lg text-xs text-zinc-400 hover:text-white hover:border-zinc-600 transition-all"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-white/60 hover:text-white hover:bg-white/5 transition-all"
                       >
-                        <span className="h-1.5 w-1.5 rounded-full bg-brand-green/60" />
+                        <TrendingUp className="h-3 w-3 text-brand-green opacity-60" />
                         {s.name}
                       </a>
                     ))}
                   </div>
                 </div>
-
-                {/* Footer */}
-                <div className="pt-4 border-t border-zinc-800 text-center">
-                  <p className="text-xs text-zinc-500">Built by Tomer & Nadav</p>
-                  <p className="text-[10px] text-zinc-600 mt-1">Finding the signal behind the market noise.</p>
-                </div>
               </div>
-            </motion.div>
-          </motion.div>
+
+              {/* Footer */}
+              <div className="p-6 border-t border-white/10 text-center">
+                <p className="text-[10px] text-zinc-500">Built by Tomer & Nadav</p>
+                <p className="text-[9px] text-zinc-600 mt-0.5">Finding the signal behind the market noise.</p>
+              </div>
+            </motion.aside>
+          </>
         )}
       </AnimatePresence>
 
