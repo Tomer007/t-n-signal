@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { 
@@ -45,51 +45,59 @@ import { generateShortReport, generateLongFormReport } from './lib/ai';
 import { AnalysisReport, MarketData } from './types';
 
 /** Formats Graham analysis markdown into styled HTML */
-function formatGrahamMarkdown(md: string): string {
-  // Process tables first (before line-level replacements)
+function formatGrahamMarkdown(md: string, isDark: boolean = true): string {
+  const textColor = isDark ? '#d4d4d8' : '#27272a';
+  const headingColor = isDark ? '#f5f5f5' : '#18181b';
+  const subheadColor = isDark ? '#1D9E75' : '#15805e';
+  const boldColor = isDark ? '#f5f5f5' : '#18181b';
+  const mutedColor = isDark ? '#71717a' : '#52525b';
+  const bgCard = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)';
+  const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)';
+  const hoverBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
+  const quoteBg = isDark ? 'rgba(29,158,117,0.08)' : 'rgba(29,158,117,0.06)';
+
   let html = md;
   
   // Convert markdown tables to proper HTML tables
   html = html.replace(/(\|[^\n]+\|\n)((?:\|[-:| ]+\|\n))((?:\|[^\n]+\|\n?)*)/g, (match, headerRow, separator, bodyRows) => {
     const headers = headerRow.split('|').filter((c: string) => c.trim()).map((c: string) => 
-      `<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#71717a;border-bottom:1px solid rgba(255,255,255,0.1)">${c.trim()}</th>`
+      `<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:${mutedColor};border-bottom:1px solid ${borderColor}">${c.trim()}</th>`
     ).join('');
     
     const rows = bodyRows.trim().split('\n').map((row: string) => {
       const cells = row.split('|').filter((c: string) => c.trim()).map((c: string) => {
         let content = c.trim();
-        // Color the result cells
         content = content.replace(/✅/g, '<span style="color:#1D9E75;font-weight:bold">✅</span>');
         content = content.replace(/❌/g, '<span style="color:#D85A30;font-weight:bold">❌</span>');
         content = content.replace(/⚠️/g, '<span style="color:#BA7517;font-weight:bold">⚠️</span>');
-        return `<td style="padding:10px 14px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05);color:#d4d4d8">${content}</td>`;
+        return `<td style="padding:10px 14px;font-size:13px;border-bottom:1px solid ${borderColor};color:${textColor}">${content}</td>`;
       }).join('');
-      return `<tr style="transition:background 0.2s" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">${cells}</tr>`;
+      return `<tr onmouseover="this.style.background='${hoverBg}'" onmouseout="this.style.background='transparent'">${cells}</tr>`;
     }).join('');
     
-    return `<div style="overflow-x:auto;margin:16px 0;border-radius:12px;border:1px solid rgba(255,255,255,0.08)"><table style="width:100%;border-collapse:collapse;font-family:inherit"><thead style="background:rgba(255,255,255,0.04)"><tr>${headers}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    return `<div style="overflow-x:auto;margin:16px 0;border-radius:12px;border:1px solid ${borderColor}"><table style="width:100%;border-collapse:collapse;font-family:inherit"><thead style="background:${bgCard}"><tr>${headers}</tr></thead><tbody>${rows}</tbody></table></div>`;
   });
 
   // Headers
-  html = html.replace(/^# (.*$)/gm, '<div style="font-size:24px;font-weight:900;color:#f5f5f5;margin:32px 0 12px;padding-bottom:12px;border-bottom:2px solid rgba(29,158,117,0.3)">$1</div>');
-  html = html.replace(/^## (.*$)/gm, '<div style="font-size:17px;font-weight:700;color:#1D9E75;margin:28px 0 10px;display:flex;align-items:center;gap:8px">$1</div>');
-  html = html.replace(/^### (.*$)/gm, '<div style="font-size:14px;font-weight:600;color:#e4e4e7;margin:20px 0 8px">$1</div>');
+  html = html.replace(/^# (.*$)/gm, `<div style="font-size:24px;font-weight:900;color:${headingColor};margin:32px 0 12px;padding-bottom:12px;border-bottom:2px solid rgba(29,158,117,0.3)">$1</div>`);
+  html = html.replace(/^## (.*$)/gm, `<div style="font-size:17px;font-weight:700;color:${subheadColor};margin:28px 0 10px;display:flex;align-items:center;gap:8px">$1</div>`);
+  html = html.replace(/^### (.*$)/gm, `<div style="font-size:14px;font-weight:600;color:${headingColor};margin:20px 0 8px">$1</div>`);
 
   // Blockquotes (scores, verdicts)
-  html = html.replace(/^> (.*$)/gm, '<div style="border-left:3px solid #1D9E75;background:rgba(29,158,117,0.08);padding:12px 16px;border-radius:0 10px 10px 0;margin:12px 0;font-weight:600;color:#f5f5f5">$1</div>');
+  html = html.replace(/^> (.*$)/gm, `<div style="border-left:3px solid #1D9E75;background:${quoteBg};padding:12px 16px;border-radius:0 10px 10px 0;margin:12px 0;font-weight:600;color:${headingColor}">$1</div>`);
 
   // Bold & italic
-  html = html.replace(/\*\*(.*?)\*\*/g, '<strong style="color:#ffffff;font-weight:700">$1</strong>');
-  html = html.replace(/\*(.*?)\*/g, '<em style="color:#a1a1aa">$1</em>');
+  html = html.replace(/\*\*(.*?)\*\*/g, `<strong style="color:${boldColor};font-weight:700">$1</strong>`);
+  html = html.replace(/\*(.*?)\*/g, `<em style="color:${mutedColor}">$1</em>`);
 
   // Horizontal rules
-  html = html.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:24px 0" />');
+  html = html.replace(/^---$/gm, `<hr style="border:none;border-top:1px solid ${borderColor};margin:24px 0" />`);
 
   // Numbered lists
-  html = html.replace(/^(\d+)\. (.*$)/gm, '<div style="display:flex;gap:10px;margin:6px 0;padding:8px 12px;background:rgba(255,255,255,0.02);border-radius:8px"><span style="color:#1D9E75;font-weight:700;min-width:20px">$1.</span><span style="color:#d4d4d8;font-size:13px">$2</span></div>');
+  html = html.replace(/^(\d+)\. (.*$)/gm, `<div style="display:flex;gap:10px;margin:6px 0;padding:8px 12px;background:${bgCard};border-radius:8px"><span style="color:#1D9E75;font-weight:700;min-width:20px">$1.</span><span style="color:${textColor};font-size:13px">$2</span></div>`);
 
   // Bullet lists
-  html = html.replace(/^- (.*$)/gm, '<div style="display:flex;gap:10px;margin:4px 0;padding:6px 12px"><span style="color:#BA7517">•</span><span style="color:#d4d4d8;font-size:13px">$1</span></div>');
+  html = html.replace(/^- (.*$)/gm, `<div style="display:flex;gap:10px;margin:4px 0;padding:6px 12px"><span style="color:#BA7517">•</span><span style="color:${textColor};font-size:13px">$1</span></div>`);
 
   // Status emojis (outside tables)
   html = html.replace(/✅/g, '<span style="color:#1D9E75">✅</span>');
@@ -163,7 +171,6 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showGuide, setShowGuide] = useState(false);
   const [zoomedWidget, setZoomedWidget] = useState<string | null>(null);
-  const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [grahamContent, setGrahamContent] = useState<string>('');
   const [grahamLoading, setGrahamLoading] = useState(false);
   const [apiLogs, setApiLogs] = useState<{ time: string; service: string; status: 'ok' | 'error'; message: string }[]>([]);
@@ -228,7 +235,6 @@ export default function App() {
 
       // Create abort controller for cancellation
       const controller = new AbortController();
-      setAbortController(controller);
       abortControllerRef.current = controller;
       
       setLongFormProgress(0);
@@ -326,7 +332,6 @@ export default function App() {
         } else if (analyzeMutation.isPending && abortControllerRef.current) {
           abortControllerRef.current.abort();
           abortControllerRef.current = null;
-          setAbortController(null);
           analyzeMutation.reset();
           setLongFormProgress(0);
           setLongFormStep('');
@@ -877,7 +882,6 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                             abortControllerRef.current.abort();
                             abortControllerRef.current = null;
                           }
-                          setAbortController(null);
                           analyzeMutation.reset();
                           setLongFormProgress(0);
                           setLongFormStep('');
@@ -1142,22 +1146,21 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               
               {/* Main Summary - Bento Span */}
-              <Card className="lg:col-span-2 md:row-span-2 bg-zinc-950 border-zinc-900 overflow-hidden group cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Executive Thesis')}>
-                <CardHeader className="border-b border-zinc-900 bg-zinc-900/10">
-                  <CardTitle className="text-sm font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-orange-500" /> Executive Thesis
+              <Card className="lg:col-span-2 md:row-span-2 bg-zinc-950 border-zinc-900 rounded-2xl overflow-hidden group cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Executive Thesis')}>
+                <CardHeader className="border-b border-zinc-900/50 p-5">
+                  <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2 section-accent">
+                    <FileText className="h-3.5 w-3.5 text-brand-green" /> Executive Thesis
                   </CardTitle>
-                  <p className="text-[10px] text-zinc-600 mt-1">AI-generated investment thesis summarizing the key bull/bear case and catalysts.</p>
                 </CardHeader>
-                <CardContent className="p-8">
-                  <p className="text-xl md:text-2xl font-medium text-zinc-200 leading-relaxed mb-8 italic">
+                <CardContent className="p-6">
+                  <p className="text-lg md:text-xl font-medium text-zinc-200 leading-relaxed mb-6 italic">
                     "{currentReport.summary}"
                   </p>
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 gap-3">
                     {currentReport.executiveSummary.points.map((p, i) => (
-                      <div key={i} className="flex items-start gap-4 p-4 bg-zinc-900/30 rounded-xl border border-zinc-900 hover:border-zinc-800 transition-colors">
-                        <CheckCircle2 className="h-5 w-5 text-orange-500 mt-0.5 flex-shrink-0" />
-                        <span className="text-sm text-zinc-400 group-hover:text-zinc-300 transition-colors">{p}</span>
+                      <div key={i} className="flex items-start gap-3 p-3 bg-white/[0.02] rounded-lg border border-white/[0.05] hover:border-white/10 transition-colors">
+                        <CheckCircle2 className="h-4 w-4 text-brand-green mt-0.5 flex-shrink-0" />
+                        <span className="text-xs text-zinc-400">{p}</span>
                       </div>
                     ))}
                   </div>
@@ -1165,14 +1168,12 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
               </Card>
 
               {/* Price Trajectory Chart - Bento Span */}
-              <Card className="lg:col-span-2 bg-zinc-950 border-zinc-900 overflow-hidden">
+              <Card className="lg:col-span-2 bg-zinc-950 border-zinc-900 rounded-2xl overflow-hidden widget-hover hover:border-zinc-700 transition-colors">
                 <CardContent className="p-0 h-[300px]">
-                  <div className="p-6 border-b border-zinc-900 flex justify-between items-center">
+                  <div className="p-5 border-b border-zinc-900/50 flex justify-between items-center">
                     <div>
-                      <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Price Performance (6M)</h3>
-                      <p className="text-[10px] text-zinc-600 mt-0.5">Daily closing price over the last 6 months from Yahoo Finance.</p>
+                      <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 section-accent flex items-center gap-2"><TrendingUp className="h-3.5 w-3.5 text-brand-green" /> Price Performance (6M)</h3>
                     </div>
-                    <TrendingUp className="h-4 w-4 text-zinc-600" />
                   </div>
                   <div className="h-[230px] w-full pt-4 pr-2">
                     {marketData?.history && marketData.history.length > 0 && (
@@ -1208,10 +1209,11 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
               </Card>
 
               {/* Sentiment Radar */}
-              <Card className="bg-zinc-950 border-zinc-900 flex flex-col cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Market Sentiment')}>
-                <CardHeader className="p-6 pb-0">
-                  <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Market Sentiment</CardTitle>
-                  <p className="text-[9px] text-zinc-700 mt-0.5">Radar chart showing news tone, social buzz, analyst consensus, technical signals, and AI confidence.</p>
+              <Card className="bg-zinc-950 border-zinc-900 rounded-2xl flex flex-col cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Market Sentiment')}>
+                <CardHeader className="p-5 pb-0">
+                  <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 section-accent flex items-center gap-2">
+                    <BarChart3 className="h-3.5 w-3.5 text-brand-green" /> Sentiment
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col items-center justify-center p-0">
                   <div className="h-[180px] w-full relative">
@@ -1225,7 +1227,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                       ]}>
                         <PolarGrid stroke="#18181b" />
                         <PolarAngleAxis dataKey="subject" stroke="#3f3f46" fontSize={8} />
-                        <Radar name="Score" dataKey="A" stroke="#ea580c" fill="#ea580c" fillOpacity={0.4} />
+                        <Radar name="Score" dataKey="A" stroke="#1D9E75" fill="#1D9E75" fillOpacity={0.3} />
                       </RadarChart>
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -1236,10 +1238,11 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
               </Card>
 
               {/* Risk Gauge */}
-              <Card className="bg-zinc-950 border-zinc-900 flex flex-col cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Risk Profile')}>
-                <CardHeader className="p-6 pb-0">
-                  <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Risk Profile</CardTitle>
-                  <p className="text-[9px] text-zinc-700 mt-0.5">Overall risk score (0–100) based on volatility, leverage, sector headwinds, and macro exposure.</p>
+              <Card className="bg-zinc-950 border-zinc-900 rounded-2xl flex flex-col cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Risk Profile')}>
+                <CardHeader className="p-5 pb-0">
+                  <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 section-accent flex items-center gap-2">
+                    <ShieldCheck className="h-3.5 w-3.5 text-brand-green" /> Risk Profile
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col items-center justify-center pt-4">
                   <div className="relative w-28 h-28 transform scale-110">
@@ -1269,12 +1272,13 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
 
             {/* SWOT & Catalysts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-               <Card className="bg-zinc-950 border-zinc-900 cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('SWOT Matrix')}>
-                  <CardHeader>
-                    <CardTitle className="text-sm font-bold uppercase tracking-widest text-zinc-500 section-accent">SWOT Matrix</CardTitle>
-                    <p className="text-[10px] text-zinc-600 mt-0.5">Strengths, Weaknesses, Opportunities & Threats — key strategic factors affecting the investment.</p>
+               <Card className="bg-zinc-950 border-zinc-900 rounded-2xl cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('SWOT Matrix')}>
+                  <CardHeader className="p-5">
+                    <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 section-accent flex items-center gap-2">
+                      <BarChart3 className="h-3.5 w-3.5 text-brand-green" /> SWOT Matrix
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-2 gap-4 p-6 pt-0">
+                  <CardContent className="grid grid-cols-2 gap-3 p-5 pt-0">
                     <div className="space-y-3">
                       <div className="text-[10px] font-bold text-green-500 uppercase tracking-widest mb-2">Strengths</div>
                       {currentReport.swot.strengths.slice(0, 2).map((s, i) => (
@@ -1301,12 +1305,13 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                     </div>
                   </CardContent>
                </Card>
-               <Card className="bg-zinc-950 border-zinc-900 cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Key Catalysts')}>
-                  <CardHeader>
-                    <CardTitle className="text-sm font-bold uppercase tracking-widest text-zinc-500 section-accent">Key Catalysts</CardTitle>
-                    <p className="text-[10px] text-zinc-600 mt-0.5">Upcoming events or triggers that could move the stock price — earnings, product launches, regulatory decisions.</p>
+               <Card className="bg-zinc-950 border-zinc-900 rounded-2xl cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Key Catalysts')}>
+                  <CardHeader className="p-5">
+                    <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 section-accent flex items-center gap-2">
+                      <Zap className="h-3.5 w-3.5 text-brand-green" /> Key Catalysts
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4 p-6 pt-0">
+                  <CardContent className="space-y-3 p-5 pt-0">
                     {currentReport.catalysts.map((c, i) => (
                       <div key={i} className="flex items-center gap-4 p-3 bg-zinc-900/20 rounded-lg border border-zinc-900">
                          <Zap className="h-4 w-4 text-orange-500" />
@@ -1375,7 +1380,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                     <div 
                       className="graham-content text-[13px] text-zinc-300 leading-relaxed max-h-[500px] overflow-y-auto p-8 cursor-pointer"
                       onClick={() => setZoomedWidget('Graham Analysis')}
-                      dangerouslySetInnerHTML={{ __html: formatGrahamMarkdown(grahamContent) }}
+                      dangerouslySetInnerHTML={{ __html: formatGrahamMarkdown(grahamContent, theme === 'dark') }}
                     />
                     {grahamLoading && (
                       <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-950 to-transparent pt-8 pb-4 px-8">
@@ -1887,8 +1892,8 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                 )}
                 {zoomedWidget === 'Graham Analysis' && grahamContent && (
                   <div 
-                    className="graham-content text-[13px] text-zinc-300 leading-relaxed max-h-[75vh] overflow-y-auto"
-                    dangerouslySetInnerHTML={{ __html: formatGrahamMarkdown(grahamContent) }}
+                    className="graham-content text-[13px] leading-relaxed max-h-[75vh] overflow-y-auto"
+                    dangerouslySetInnerHTML={{ __html: formatGrahamMarkdown(grahamContent, theme === 'dark') }}
                   />
                 )}
               </div>
