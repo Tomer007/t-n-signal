@@ -160,7 +160,7 @@ export default function App() {
   const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [history, setHistory] = useState<string[]>([]);
   const [historyData, setHistoryData] = useState<Record<string, { report?: AnalysisReport; longFormContent?: string; prompt?: string }>>({});
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showGuide, setShowGuide] = useState(false);
   const [zoomedWidget, setZoomedWidget] = useState<string | null>(null);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
@@ -707,21 +707,20 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
       {/* Research Vault Sidebar */}
       <motion.aside 
         initial={false}
-        animate={{ width: isSidebarOpen ? 280 : 0, opacity: isSidebarOpen ? 1 : 0 }}
+        animate={{ width: isSidebarOpen ? 160 : 0, opacity: isSidebarOpen ? 1 : 0 }}
         className={`h-screen sticky top-0 border-r overflow-hidden flex flex-col z-[60] ${theme === 'dark' ? 'bg-brand-navy border-white/10' : 'bg-white border-zinc-200'}`}
       >
-        <div className="p-6">
-          <div className="flex items-center gap-2 mb-8">
-            <div className="h-8 w-8 bg-brand-green rounded-lg flex items-center justify-center">
-              <Zap className="h-5 w-5 text-white" />
+        <div className="p-3">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="h-5 w-5 bg-brand-green rounded flex items-center justify-center">
+              <Zap className="h-3 w-3 text-white" />
             </div>
-            <span className="font-bold tracking-tight text-xl text-brand-bone">History</span>
+            <span className="font-bold tracking-tight text-xs text-brand-bone">History</span>
           </div>
           
-          <div className="space-y-6">
+          <div>
             <div>
-              <h3 className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4">Recent Research</h3>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {history.length > 0 ? history.slice(0, 20).map(item => (
                   <button
                     key={item}
@@ -750,7 +749,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                         });
                       }
                     }}
-                    className="w-full text-left px-3 py-2 rounded-lg text-sm text-white/60 hover:text-white hover:bg-white/5 transition-all flex items-center justify-between group"
+                    className="w-full text-left px-2 py-1.5 rounded-md text-xs text-white/60 hover:text-white hover:bg-white/5 transition-all flex items-center justify-between group truncate"
                   >
                     <span>{item}</span>
                     <TrendingUp className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-brand-green" />
@@ -1093,6 +1092,52 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
               </div>
             </div>
 
+            {/* Verdict Card — First Widget */}
+            <Card className="bg-gradient-to-r from-brand-navy via-brand-navy to-brand-blue/20 border border-white/10 shadow-2xl shadow-brand-navy/40 text-white relative overflow-hidden rounded-2xl">
+              <div className="absolute top-0 right-0 p-8 transform translate-x-4 -translate-y-4 opacity-5">
+                <Zap className="h-40 w-40 text-white" />
+              </div>
+              <CardContent className="p-8 md:p-10 relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
+                <div className="text-center md:text-left space-y-3 flex-shrink-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-blue">Signal Verdict</p>
+                  <h3 className={`text-7xl md:text-8xl font-black italic transform -skew-x-6 ${
+                    currentReport.recommendation === 'BUY' ? 'text-brand-green' : currentReport.recommendation === 'SELL' ? 'text-brand-coral' : 'text-brand-amber'
+                  }`}>{currentReport.recommendation}</h3>
+                  <p className="text-[11px] text-white/40 max-w-[220px]">Based on fundamentals, sentiment, risk analysis, and market data.</p>
+                </div>
+                <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-6 md:border-l md:border-white/10 md:pl-10">
+                  <div className="text-center md:text-left">
+                    <p className="text-[10px] font-bold uppercase text-white/30 mb-1">Entry</p>
+                    <p className="text-2xl md:text-3xl font-mono font-bold text-brand-green">{currentReport.priceTargets.entry}</p>
+                  </div>
+                  <div className="text-center md:text-left">
+                    <p className="text-[10px] font-bold uppercase text-white/30 mb-1">Exit</p>
+                    <p className="text-2xl md:text-3xl font-mono font-bold text-brand-blue">{currentReport.priceTargets.exit}</p>
+                  </div>
+                  <div className="text-center md:text-left">
+                    <p className="text-[10px] font-bold uppercase text-white/30 mb-1">Confidence</p>
+                    <p className="text-2xl md:text-3xl font-mono font-bold text-white">{currentReport.confidence}%</p>
+                  </div>
+                  <div className="text-center md:text-left">
+                    <p className="text-[10px] font-bold uppercase text-white/30 mb-1">Risk</p>
+                    <p className={`text-2xl md:text-3xl font-mono font-bold ${currentReport.riskScore > 70 ? 'text-brand-coral' : currentReport.riskScore > 40 ? 'text-brand-amber' : 'text-brand-green'}`}>{currentReport.riskScore}/100</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Key Financial Metrics — Full Width */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2 cursor-pointer" onClick={() => setZoomedWidget('Metrics')}>
+              {currentReport.metrics.map((m, i) => (
+                <div key={i} className="p-3 rounded-xl bg-zinc-950 border border-zinc-900 hover:border-zinc-700 widget-hover text-center">
+                  <p className={`text-base font-mono font-bold ${
+                    m.status === 'positive' ? 'text-brand-green' : m.status === 'negative' ? 'text-brand-coral' : 'text-zinc-200'
+                  }`}>{m.value}</p>
+                  <p className="text-[9px] text-zinc-500 uppercase tracking-wider mt-1 truncate">{m.label}</p>
+                </div>
+              ))}
+            </div>
+
             {/* Bento Grid Layout */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               
@@ -1218,25 +1263,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                 </CardContent>
               </Card>
               
-              {/* Metrics Table - Bento Span */}
-              <Card className="lg:col-span-2 bg-zinc-950 border-zinc-900 cursor-pointer widget-hover hover:border-zinc-700 transition-colors" onClick={() => setZoomedWidget('Metrics')}>
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    {currentReport.metrics.map((m, i) => (
-                      <div key={i} className="flex justify-between items-center group">
-                        <span className="text-sm text-white/30 group-hover:text-white/60 transition-colors uppercase tracking-tight font-mono">{m.label}</span>
-                        <div className="flex items-center gap-3">
-                          <p className={`text-sm font-mono font-bold ${
-                            m.status === 'positive' ? 'text-brand-green' : m.status === 'negative' ? 'text-brand-coral' : 'text-zinc-300'
-                          }`}>{m.value}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Metrics removed from bento - verdict moved above */}
+              {/* Metrics removed - moved above bento grid */}
 
             </div>
 
