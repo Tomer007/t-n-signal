@@ -1246,28 +1246,28 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
               </div>
               <CardContent className="p-8 md:p-10 relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
                 <div className="text-center md:text-left space-y-3 flex-shrink-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Signal Verdict</p>
+                  <p className="text-[11px] font-black uppercase tracking-[0.3em]" style={{ color: 'rgba(255,255,255,0.9)' }}>Signal Verdict</p>
                   <h3 className={`text-7xl md:text-8xl font-black italic transform -skew-x-6 ${
                     currentReport.recommendation === 'BUY' ? 'text-brand-green' : currentReport.recommendation === 'SELL' ? 'text-brand-coral' : 'text-yellow-400'
                   }`}>{currentReport.recommendation}</h3>
-                  <p className="text-[11px] text-white/60 max-w-[220px]">Based on fundamentals, sentiment, risk analysis, and market data.</p>
+                  <p className="text-xs max-w-[220px]" style={{ color: 'rgba(255,255,255,0.6)' }}>Based on fundamentals, sentiment, risk analysis, and market data.</p>
                 </div>
                 <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-6 md:border-l md:border-white/20 md:pl-10">
                   <div className="text-center md:text-left">
-                    <p className="text-[10px] font-bold uppercase text-white/60 mb-1">Entry</p>
+                    <p className="text-[10px] font-bold uppercase mb-1" style={{ color: 'rgba(255,255,255,0.7)' }}>Entry</p>
                     <p className="text-2xl md:text-3xl font-mono font-bold text-brand-green">{currentReport.priceTargets.entry}</p>
                   </div>
                   <div className="text-center md:text-left">
-                    <p className="text-[10px] font-bold uppercase text-white/60 mb-1">Exit</p>
+                    <p className="text-[10px] font-bold uppercase mb-1" style={{ color: 'rgba(255,255,255,0.7)' }}>Exit</p>
                     <p className="text-2xl md:text-3xl font-mono font-bold text-brand-blue">{currentReport.priceTargets.exit}</p>
                   </div>
                   <div className="text-center md:text-left">
-                    <p className="text-[10px] font-bold uppercase text-white/60 mb-1">Confidence</p>
-                    <p className="text-2xl md:text-3xl font-mono font-bold text-white">{safeNum(currentReport.confidence)}%</p>
+                    <p className="text-[10px] font-bold uppercase mb-1" style={{ color: 'rgba(255,255,255,0.7)' }}>Confidence</p>
+                    <p className="text-2xl md:text-3xl font-mono font-bold" style={{ color: 'white' }}>{safeNum(currentReport.confidence)}%</p>
                   </div>
                   <div className="text-center md:text-left">
-                    <p className="text-[10px] font-bold uppercase text-white/60 mb-1">Risk</p>
-                    <p className={`text-2xl md:text-3xl font-mono font-bold ${safeNum(currentReport.riskScore) > 70 ? 'text-brand-coral' : safeNum(currentReport.riskScore) > 40 ? 'text-brand-amber' : 'text-brand-green'}`}>{safeNum(currentReport.riskScore)}/100</p>
+                    <p className="text-[10px] font-bold uppercase mb-1" style={{ color: 'rgba(255,255,255,0.7)' }}>Risk</p>
+                    <p className={`text-2xl md:text-3xl font-mono font-bold ${safeNum(currentReport.riskScore) > 70 ? 'text-brand-coral' : safeNum(currentReport.riskScore) > 40 ? 'text-yellow-400' : 'text-brand-green'}`}>{safeNum(currentReport.riskScore)}/100</p>
                   </div>
                 </div>
               </CardContent>
