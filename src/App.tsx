@@ -644,6 +644,8 @@ ${ratiosData}
 6. If a specific data point is not available in ANY of the provided data blocks, mark it as ⚠️ UNKNOWN.
 7. Calculate 5-year and 10-year EPS growth from the HISTORICAL INCOME STATEMENTS if available.
 8. Calculate Net Current Asset Value from BALANCE SHEET DATA if available.
+9. IMPORTANT — Framework Limitation Note: If the company is asset-light (tech, IP-heavy, SaaS), add a note in the FINAL VERDICT: "⚠️ Graham's framework was designed for industrial/asset-heavy companies. For IP-heavy businesses, Price-to-Book and Net Current Asset Value criteria are structurally unfavorable and should be weighted less heavily."
+10. If the Graham screen says AVOID but fundamentals are strong (high ROE, growing EPS, strong moat), reconcile: "Quantitative Graham screen: AVOID. Qualitative assessment: [your view]. Reconciliation: [explain why they differ]."
 
 ---
 
@@ -1447,7 +1449,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-2xl font-black text-white">{safeNum(currentReport.riskScore)}</span>
-                      <span className="text-[8px] text-zinc-500 uppercase font-bold">Danger</span>
+                      <span className="text-[8px] text-zinc-500 uppercase font-bold">{safeNum(currentReport.riskScore) > 70 ? 'High Risk' : safeNum(currentReport.riskScore) > 40 ? 'Moderate' : 'Low Risk'}</span>
                     </div>
                   </div>
                 </CardContent>

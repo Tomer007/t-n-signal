@@ -153,9 +153,12 @@ CRITICAL RULES:
 1. You may ONLY cite numbers that appear in <verified_data>. For anything else, write "UNKNOWN — verification required."
 2. Do NOT invent citations like "10-K FY2024, p.42" — you have no access to filings.
 3. The "recommendation" field uses: BUY (bull case dominant), HOLD (balanced), SELL (bear case dominant), WATCH (insufficient data).
-4. Price targets MUST be derived from the TARGET MEAN/HIGH/LOW in verified_data. If unavailable, use "UNKNOWN".
-5. sentimentScore and riskScore must be 0-100 integers.
-6. confidence must be 0-100 integer.
+4. Price targets MUST be derived from TARGET MEAN/HIGH/LOW in verified_data. Format as "$X (analyst consensus)" or "$X (Y× forward EPS)". If unavailable, use "UNKNOWN". NEVER invent round numbers without justification.
+5. sentimentScore: 0-100 integer. 0=extreme fear, 50=neutral, 100=extreme greed. Based on news tone + analyst ratings from verified_data.
+6. riskScore: 0-100 integer. 0=treasury-safe, 50=market-average, 100=extreme risk. Based on beta, debt/equity, earnings volatility from verified_data. NOTE: Higher score = MORE risk (bearish direction).
+7. confidence: 0-100 integer. Defined as: "How much verified data supports this conclusion?" 90+=rich data, 50=partial, <30=mostly guessing.
+8. SWOT threats MUST include real, specific bear cases: competitive threats by name, regulatory risks, geopolitical exposure, customer concentration. Do NOT use generic phrases.
+9. Catalysts MUST be specific: name companies, dates, deal sizes where known. Flag rumors explicitly as "[RUMOR]".
 
 Return a structured JSON report with these exact keys:
 {
@@ -163,13 +166,13 @@ Return a structured JSON report with these exact keys:
   "summary": "2-3 sentence thesis based ONLY on verified data",
   "executiveSummary": { "points": ["string array of 3-5 key findings from verified data"] },
   "metrics": [{ "label": "string", "value": "string from verified_data", "status": "positive|negative|neutral" }],
-  "swot": { "strengths": ["..."], "weaknesses": ["..."], "opportunities": ["..."], "threats": ["..."] },
+  "swot": { "strengths": ["..."], "weaknesses": ["real specific risks with named competitors/threats"], "opportunities": ["..."], "threats": ["specific named threats — e.g. 'Apple internal modem development', 'China export restrictions'"] },
   "sentimentScore": 0-100,
   "riskScore": 0-100,
   "recommendation": "BUY|HOLD|SELL|WATCH",
   "confidence": 0-100,
-  "priceTargets": { "entry": "$X (from target low/mean)", "exit": "$X (from target high)" },
-  "catalysts": ["upcoming events from news"]
+  "priceTargets": { "entry": "$X (justification: Y× metric)", "exit": "$X (justification: Z× metric)" },
+  "catalysts": ["specific upcoming events with dates/names where known, flag [RUMOR] if unconfirmed"]
 }`;
 
   try {
