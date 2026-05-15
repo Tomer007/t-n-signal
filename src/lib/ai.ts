@@ -114,31 +114,63 @@ export interface ShortReportResult {
 }
 
 export async function generateShortReport(data: MarketData, newsData: NewsItem[], query: string): Promise<ShortReportResult> {
+  // ═══════════════════════════════════════════════════════════════
+  // PASS 1: Generate core thesis + price targets (locked context)
+  // ═══════════════════════════════════════════════════════════════
+  const verifiedData = `<verified_data>
+TICKER: ${query.toUpperCase()}
+CURRENT PRICE: ${data.quote?.regularMarketPrice || 'UNKNOWN'}
+MARKET CAP: ${data.quote?.marketCap || 'UNKNOWN'}
+52-WEEK HIGH: ${data.quote?.fiftyTwoWeekHigh || 'UNKNOWN'}
+52-WEEK LOW: ${data.quote?.fiftyTwoWeekLow || 'UNKNOWN'}
+TRAILING P/E: ${(data.summary as any)?.summaryDetail?.trailingPE || data.quote?.trailingPE || 'UNKNOWN'}
+FORWARD P/E: ${(data.summary as any)?.summaryDetail?.forwardPE || data.quote?.forwardPE || 'UNKNOWN'}
+EPS (TTM): ${data.quote?.epsTrailingTwelveMonths || 'UNKNOWN'}
+DIVIDEND YIELD: ${(data.summary as any)?.summaryDetail?.trailingAnnualDividendYield ? ((data.summary as any).summaryDetail.trailingAnnualDividendYield * 100).toFixed(2) + '%' : 'UNKNOWN'}
+BETA: ${(data.summary as any)?.defaultKeyStatistics?.beta || 'UNKNOWN'}
+BOOK VALUE: ${(data.summary as any)?.defaultKeyStatistics?.bookValue || 'UNKNOWN'}
+DEBT TO EQUITY: ${(data.summary as any)?.financialData?.debtToEquity || 'UNKNOWN'}
+CURRENT RATIO: ${(data.summary as any)?.financialData?.currentRatio || 'UNKNOWN'}
+PROFIT MARGINS: ${(data.summary as any)?.financialData?.profitMargins || 'UNKNOWN'}
+REVENUE GROWTH: ${(data.summary as any)?.financialData?.revenueGrowth || 'UNKNOWN'}
+ANALYST RATING: ${data.quote?.averageAnalystRating || 'UNKNOWN'}
+TARGET MEAN PRICE: ${(data.summary as any)?.financialData?.targetMeanPrice || 'UNKNOWN'}
+TARGET HIGH: ${(data.summary as any)?.financialData?.targetHighPrice || 'UNKNOWN'}
+TARGET LOW: ${(data.summary as any)?.financialData?.targetLowPrice || 'UNKNOWN'}
+</verified_data>
+
+<recent_news>
+${newsData.slice(0, 8).map(n => `- ${n.title} (${n.publisher})`).join('\n')}
+</recent_news>`;
+
   const prompt = `${SYSTEM_PROMPT}
 
-Analyze the following stock/sector: ${query}
-  
-  Market Data:
-  ${JSON.stringify(data.quote, null, 2)}
-  
-  Brief Summary:
-  ${JSON.stringify(data.summary, null, 2)}
-  
-  Recent News:
-  ${newsData.map(n => `- ${n.title} (${n.publisher})`).join('\n')}
-  
-  Return a structured JSON report with keys:
-  - ticker: string
-  - summary: string
-  - executiveSummary: { points: string[] }
-  - metrics: { label: string, value: string, status: 'positive' | 'negative' | 'neutral' }[]
-  - swot: { strengths: string[], weaknesses: string[], opportunities: string[], threats: string[] }
-  - sentimentScore: number
-  - riskScore: number
-  - recommendation: 'BUY' | 'HOLD' | 'SELL' | 'WATCH'
-  - confidence: number
-  - priceTargets: { entry: string, exit: string }
-  - catalysts: string[]`;
+You are analyzing: ${query}
+
+${verifiedData}
+
+CRITICAL RULES:
+1. You may ONLY cite numbers that appear in <verified_data>. For anything else, write "UNKNOWN — verification required."
+2. Do NOT invent citations like "10-K FY2024, p.42" — you have no access to filings.
+3. The "recommendation" field uses: BUY (bull case dominant), HOLD (balanced), SELL (bear case dominant), WATCH (insufficient data).
+4. Price targets MUST be derived from the TARGET MEAN/HIGH/LOW in verified_data. If unavailable, use "UNKNOWN".
+5. sentimentScore and riskScore must be 0-100 integers.
+6. confidence must be 0-100 integer.
+
+Return a structured JSON report with these exact keys:
+{
+  "ticker": "string",
+  "summary": "2-3 sentence thesis based ONLY on verified data",
+  "executiveSummary": { "points": ["string array of 3-5 key findings from verified data"] },
+  "metrics": [{ "label": "string", "value": "string from verified_data", "status": "positive|negative|neutral" }],
+  "swot": { "strengths": ["..."], "weaknesses": ["..."], "opportunities": ["..."], "threats": ["..."] },
+  "sentimentScore": 0-100,
+  "riskScore": 0-100,
+  "recommendation": "BUY|HOLD|SELL|WATCH",
+  "confidence": 0-100,
+  "priceTargets": { "entry": "$X (from target low/mean)", "exit": "$X (from target high)" },
+  "catalysts": ["upcoming events from news"]
+}`;
 
   try {
     const res = await axios.post('/api/analyze', { prompt });
@@ -202,8 +234,12 @@ export async function* generateLongFormReport(data: MarketData, newsData: NewsIt
     ${finalPromptHeader}
     
     AVAILABLE MARKET DATA:
+    <verified_data>
     ${JSON.stringify(data.quote, null, 2)}
     ${JSON.stringify(data.summary, null, 2)}
+    </verified_data>
+    
+    CRITICAL: You may ONLY cite numbers from <verified_data>. For anything else, write "UNKNOWN — verification required." Do NOT invent citations.
     
     LATEST NEWS:
     ${newsData.slice(0, 10).map(n => `- ${n.title} (${n.publisher})`).join('\n')}

@@ -382,3 +382,44 @@ html.light .select-none {
   width: 18px;
   height: 18px;
 }
+
+/* Mobile responsive fixes */
+@media (max-width: 768px) {
+  .container { padding: 1rem !important; }
+  
+  /* Hide sidebar on mobile by default */
+  [class*="sticky top-0"] { display: none; }
+  
+  /* Make bento grid single column */
+  .grid-cols-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  
+  /* Verdict card responsive */
+  .text-7xl, .text-8xl { font-size: 3rem !important; }
+  
+  /* Market overview grid */
+  .grid-cols-9 { grid-template-columns: repeat(3, 1fr) !important; }
+  
+  /* Metrics grid */
+  .lg\:grid-cols-8 { grid-template-columns: repeat(2, 1fr) !important; }
+  
+  /* Search input */
+  .h-16 { height: 3.5rem !important; }
+  .text-xl { font-size: 1rem !important; }
+  
+  /* Hero title */
+  .text-6xl { font-size: 2.5rem !important; }
+  .md\:text-8xl { font-size: 2.5rem !important; }
+  
+  /* Terminal panel */
+  .terminal-glow { height: 45vh !important; }
+  
+  /* Action bar buttons wrap */
+  .flex-wrap { flex-wrap: wrap !important; }
+}
+
+@media (max-width: 480px) {
+  .grid-cols-9 { grid-template-columns: repeat(2, 1fr) !important; }
+  .md\:grid-cols-5 { grid-template-columns: repeat(2, 1fr) !important; }
+  .text-6xl { font-size: 2rem !important; }
+  .p-8, .p-10 { padding: 1rem !important; }
+}
