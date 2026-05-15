@@ -44,6 +44,14 @@ import { Toaster, toast } from 'sonner';
 import { generateShortReport, generateLongFormReport } from './lib/ai';
 import { AnalysisReport, MarketData } from './types';
 
+/** Safely converts a value to a displayable number */
+function safeNum(val: any, fallback: number = 0): number {
+  if (typeof val === 'number' && !isNaN(val)) return val;
+  if (typeof val === 'string') { const n = parseFloat(val); if (!isNaN(n)) return n; }
+  if (val && typeof val === 'object' && 'raw' in val) return safeNum(val.raw, fallback);
+  return fallback;
+}
+
 /** Formats Graham analysis markdown into styled HTML */
 function formatGrahamMarkdown(md: string, isDark: boolean = true): string {
   const textColor = isDark ? '#d4d4d8' : '#27272a';
@@ -1211,7 +1219,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                     <Badge className={currentReport.recommendation === 'BUY' ? 'bg-green-600' : currentReport.recommendation === 'SELL' ? 'bg-red-600' : 'bg-orange-600'}>
                       {currentReport.recommendation}
                     </Badge>
-                    <span className="text-[10px] text-zinc-500 font-mono">CONFIDENCE: {currentReport.confidence}%</span>
+                    <span className="text-[10px] text-zinc-500 font-mono">CONFIDENCE: {safeNum(currentReport.confidence)}%</span>
                   </div>
                 </div>
               </div>
@@ -1254,11 +1262,11 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                   </div>
                   <div className="text-center md:text-left">
                     <p className="text-[10px] font-bold uppercase text-white/30 mb-1">Confidence</p>
-                    <p className="text-2xl md:text-3xl font-mono font-bold text-white">{currentReport.confidence}%</p>
+                    <p className="text-2xl md:text-3xl font-mono font-bold text-white">{safeNum(currentReport.confidence)}%</p>
                   </div>
                   <div className="text-center md:text-left">
                     <p className="text-[10px] font-bold uppercase text-white/30 mb-1">Risk</p>
-                    <p className={`text-2xl md:text-3xl font-mono font-bold ${currentReport.riskScore > 70 ? 'text-brand-coral' : currentReport.riskScore > 40 ? 'text-brand-amber' : 'text-brand-green'}`}>{currentReport.riskScore}/100</p>
+                    <p className={`text-2xl md:text-3xl font-mono font-bold ${safeNum(currentReport.riskScore) > 70 ? 'text-brand-coral' : safeNum(currentReport.riskScore) > 40 ? 'text-brand-amber' : 'text-brand-green'}`}>{safeNum(currentReport.riskScore)}/100</p>
                   </div>
                 </div>
               </CardContent>
@@ -1353,11 +1361,11 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                   <div className="h-[180px] w-full relative">
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart cx="50%" cy="50%" outerRadius="80%" data={[
-                        { subject: 'News', A: currentReport.sentimentScore },
-                        { subject: 'Social', A: Math.max(0, currentReport.sentimentScore - 15) },
-                        { subject: 'Analyst', A: Math.min(100, currentReport.sentimentScore + 5) },
+                        { subject: 'News', A: safeNum(currentReport.sentimentScore) },
+                        { subject: 'Social', A: Math.max(0, safeNum(currentReport.sentimentScore) - 15) },
+                        { subject: 'Analyst', A: Math.min(100, safeNum(currentReport.sentimentScore) + 5) },
                         { subject: 'Tech', A: 75 },
-                        { subject: 'Conf', A: currentReport.confidence },
+                        { subject: 'Conf', A: safeNum(currentReport.confidence) },
                       ]}>
                         <PolarGrid stroke="#18181b" />
                         <PolarAngleAxis dataKey="subject" stroke="#3f3f46" fontSize={8} />
@@ -1365,7 +1373,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                       </RadarChart>
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                       <span className="text-2xl font-black text-white">{currentReport.sentimentScore}%</span>
+                       <span className="text-2xl font-black text-white">{safeNum(currentReport.sentimentScore)}%</span>
                     </div>
                   </div>
                 </CardContent>
@@ -1384,16 +1392,16 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                       <circle cx="50" cy="50" r="45" fill="none" stroke="#18181b" strokeWidth="10" />
                       <circle 
                         cx="50" cy="50" r="45" fill="none" 
-                        stroke={currentReport.riskScore > 70 ? '#DC2626' : currentReport.riskScore > 40 ? '#F59E0B' : '#1D9E75'} 
+                        stroke={safeNum(currentReport.riskScore) > 70 ? '#DC2626' : safeNum(currentReport.riskScore) > 40 ? '#F59E0B' : '#1D9E75'} 
                         strokeWidth="10" 
-                        strokeDasharray={`${currentReport.riskScore * 2.82} 282`}
+                        strokeDasharray={`${safeNum(currentReport.riskScore) * 2.82} 282`}
                         strokeLinecap="round"
                         transform="rotate(-90 50 50)"
                         className="transition-all duration-1000 ease-out"
                       />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-black text-white">{currentReport.riskScore}</span>
+                      <span className="text-2xl font-black text-white">{safeNum(currentReport.riskScore)}</span>
                       <span className="text-[8px] text-zinc-500 uppercase font-bold">Danger</span>
                     </div>
                   </div>
@@ -2015,22 +2023,22 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                 )}
                 {zoomedWidget === 'Market Sentiment' && currentReport && (
                   <div className="text-center">
-                    <p className="text-6xl font-black text-brand-green mb-4">{currentReport.sentimentScore}%</p>
+                    <p className="text-6xl font-black text-brand-green mb-4">{safeNum(currentReport.sentimentScore)}%</p>
                     <p className="text-zinc-500">Overall market sentiment score based on news, social media, analyst ratings, and technical indicators.</p>
                     <div className="grid grid-cols-2 gap-4 mt-6">
-                      <div className="bg-zinc-900/50 p-4 rounded-lg"><span className="text-xs text-zinc-500">News Tone</span><p className="text-lg font-bold">{currentReport.sentimentScore}%</p></div>
-                      <div className="bg-zinc-900/50 p-4 rounded-lg"><span className="text-xs text-zinc-500">Confidence</span><p className="text-lg font-bold">{currentReport.confidence}%</p></div>
+                      <div className="bg-zinc-900/50 p-4 rounded-lg"><span className="text-xs text-zinc-500">News Tone</span><p className="text-lg font-bold">{safeNum(currentReport.sentimentScore)}%</p></div>
+                      <div className="bg-zinc-900/50 p-4 rounded-lg"><span className="text-xs text-zinc-500">Confidence</span><p className="text-lg font-bold">{safeNum(currentReport.confidence)}%</p></div>
                     </div>
                   </div>
                 )}
                 {zoomedWidget === 'Risk Profile' && currentReport && (
                   <div className="text-center">
-                    <p className="text-6xl font-black text-brand-coral mb-4">{currentReport.riskScore}/100</p>
+                    <p className="text-6xl font-black text-brand-coral mb-4">{safeNum(currentReport.riskScore)}/100</p>
                     <p className="text-zinc-500 mb-6">Higher score = higher risk. Based on volatility, leverage, sector headwinds, and macro exposure.</p>
                     <div className="bg-zinc-900/50 p-4 rounded-lg inline-block">
                       <span className="text-xs text-zinc-500">Risk Level: </span>
-                      <span className={`font-bold ${currentReport.riskScore > 70 ? 'text-red-500' : currentReport.riskScore > 40 ? 'text-amber-500' : 'text-green-500'}`}>
-                        {currentReport.riskScore > 70 ? 'HIGH' : currentReport.riskScore > 40 ? 'MODERATE' : 'LOW'}
+                      <span className={`font-bold ${safeNum(currentReport.riskScore) > 70 ? 'text-red-500' : safeNum(currentReport.riskScore) > 40 ? 'text-amber-500' : 'text-green-500'}`}>
+                        {safeNum(currentReport.riskScore) > 70 ? 'HIGH' : safeNum(currentReport.riskScore) > 40 ? 'MODERATE' : 'LOW'}
                       </span>
                     </div>
                   </div>
