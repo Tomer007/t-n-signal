@@ -171,62 +171,6 @@ export default function App() {
       setLoginError('Invalid credentials');
     }
   };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 font-sans">
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-          className="w-full max-w-sm"
-        >
-          <div className="text-center mb-8">
-            <div className="h-12 w-12 bg-brand-green rounded-xl flex items-center justify-center mx-auto mb-4">
-              <Zap className="h-7 w-7 text-white" />
-            </div>
-            <h1 className="text-3xl font-black text-white italic">T&N Signal.</h1>
-            <p className="text-sm text-zinc-500 mt-2">Finding the signal behind the market noise.</p>
-          </div>
-
-          <form onSubmit={handleLogin} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-8 space-y-5">
-            <div>
-              <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-2 block">Username</label>
-              <input
-                type="text"
-                value={loginUser}
-                onChange={(e) => setLoginUser(e.target.value)}
-                className="w-full h-12 px-4 bg-zinc-900 border border-zinc-800 rounded-xl text-white placeholder:text-zinc-600 focus:outline-none focus:border-brand-green/50 transition-colors"
-                placeholder="Enter username"
-                autoFocus
-              />
-            </div>
-            <div>
-              <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-2 block">Password</label>
-              <input
-                type="password"
-                value={loginPass}
-                onChange={(e) => setLoginPass(e.target.value)}
-                className="w-full h-12 px-4 bg-zinc-900 border border-zinc-800 rounded-xl text-white placeholder:text-zinc-600 focus:outline-none focus:border-brand-green/50 transition-colors"
-                placeholder="Enter password"
-              />
-            </div>
-            {loginError && (
-              <p className="text-xs text-brand-coral font-medium text-center">{loginError}</p>
-            )}
-            <button
-              type="submit"
-              className="w-full h-12 bg-brand-green hover:bg-brand-green/90 text-white font-bold rounded-xl transition-all active:scale-95 shadow-lg shadow-brand-green/20"
-            >
-              Sign In
-            </button>
-          </form>
-
-          <p className="text-center text-[10px] text-zinc-600 mt-6">Build v{APP_VERSION}</p>
-        </motion.div>
-      </div>
-    );
-  }
   const LOADING_VIDEOS = [
     '/videos/YTDown_YouTube_Eliud-Kipchoge-the-greatest-marathon-run_Media_VkrebDIx9UQ_001_1080p.mp4',
     '/videos/13494091_2160_3840_25fps.mp4',
@@ -818,6 +762,63 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
       setGrahamLoading(false);
     }
   };
+
+  // Login gate — MUST be after all hooks
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 font-sans">
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+          className="w-full max-w-sm"
+        >
+          <div className="text-center mb-8">
+            <div className="h-12 w-12 bg-brand-green rounded-xl flex items-center justify-center mx-auto mb-4">
+              <Zap className="h-7 w-7 text-white" />
+            </div>
+            <h1 className="text-3xl font-black text-white italic">T&N Signal.</h1>
+            <p className="text-sm text-zinc-500 mt-2">Finding the signal behind the market noise.</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-8 space-y-5">
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-2 block">Username</label>
+              <input
+                type="text"
+                value={loginUser}
+                onChange={(e) => setLoginUser(e.target.value)}
+                className="w-full h-12 px-4 bg-zinc-900 border border-zinc-800 rounded-xl text-white placeholder:text-zinc-600 focus:outline-none focus:border-brand-green/50 transition-colors"
+                placeholder="Enter username"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-2 block">Password</label>
+              <input
+                type="password"
+                value={loginPass}
+                onChange={(e) => setLoginPass(e.target.value)}
+                className="w-full h-12 px-4 bg-zinc-900 border border-zinc-800 rounded-xl text-white placeholder:text-zinc-600 focus:outline-none focus:border-brand-green/50 transition-colors"
+                placeholder="Enter password"
+              />
+            </div>
+            {loginError && (
+              <p className="text-xs text-brand-coral font-medium text-center">{loginError}</p>
+            )}
+            <button
+              type="submit"
+              className="w-full h-12 bg-brand-green hover:bg-brand-green/90 text-white font-bold rounded-xl transition-all active:scale-95 shadow-lg shadow-brand-green/20"
+            >
+              Sign In
+            </button>
+          </form>
+
+          <p className="text-center text-[10px] text-zinc-600 mt-6">Build v{APP_VERSION}</p>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen font-sans selection:bg-orange-500/30 flex ${theme === 'dark' ? 'bg-[#050505] text-zinc-100' : 'bg-white text-zinc-900'}`}>
