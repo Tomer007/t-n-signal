@@ -1465,7 +1465,8 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                </Card>
             </div>
 
-            {/* Benjamin Graham Value Analysis Widget */}
+            {/* Benjamin Graham Value Analysis Widget — only show when content exists */}
+            {(grahamContent || grahamLoading) && (
             <Card className="bg-zinc-950 border-zinc-900 overflow-hidden hover:border-zinc-700 transition-colors">
               <CardHeader className="border-b border-zinc-900 bg-gradient-to-r from-zinc-900/40 to-zinc-950 p-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -1495,15 +1496,6 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                 </div>
               </CardHeader>
               <CardContent className="p-0">
-                {!grahamContent && !grahamLoading && (
-                  <div className="text-center py-16 px-6">
-                    <div className="h-16 w-16 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-center mx-auto mb-5">
-                      <ShieldCheck className="h-8 w-8 text-zinc-600" />
-                    </div>
-                    <p className="text-sm text-zinc-400 mb-2">Evaluate <strong className="text-white">{currentReport.ticker}</strong> against Benjamin Graham's framework</p>
-                    <p className="text-xs text-zinc-600 max-w-md mx-auto">The Intelligent Investor's defensive criteria — financial strength, earnings stability, valuation discipline, and margin of safety.</p>
-                  </div>
-                )}
                 {(grahamContent || grahamLoading) && (
                   <div className="relative">
                     <div 
@@ -1527,6 +1519,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                 )}
               </CardContent>
             </Card>
+            )}
 
             {/* Used Prompt — Collapsed by default */}
             {activePrompt && (
