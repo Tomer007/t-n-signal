@@ -937,6 +937,15 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
              >
                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
              </Button>
+             <Button
+               variant="ghost"
+               size="sm"
+               onClick={() => { localStorage.removeItem('tn-signal-auth'); setIsAuthenticated(false); }}
+               className={`${ghostBtnClass} text-xs`}
+               title="Logout"
+             >
+               Logout
+             </Button>
           </div>
         </nav>
 
@@ -1606,9 +1615,9 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                 return (
                   <div key={i} className="p-3 bg-zinc-950 border border-zinc-900 rounded-xl text-center widget-hover hover:border-zinc-700 cursor-pointer" onClick={() => { setQuery(idx.symbol); analyzeMutation.mutate(idx.symbol); }}>
                     <p className="text-[9px] text-zinc-500 uppercase tracking-wider mb-1">{label}</p>
-                    <p className="text-sm font-mono font-bold text-zinc-200">{idx.price?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                    <p className="text-sm font-mono font-bold text-zinc-200">{typeof idx.price === 'number' ? idx.price.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}</p>
                     <p className={`text-[10px] font-mono font-bold mt-0.5 ${isUp ? 'text-brand-green' : 'text-brand-coral'}`}>
-                      {isUp ? '▲' : '▼'} {Math.abs(idx.changePercent)?.toFixed(2)}%
+                      {isUp ? '▲' : '▼'} {typeof idx.changePercent === 'number' ? Math.abs(idx.changePercent).toFixed(2) : '0.00'}%
                     </p>
                   </div>
                 );
@@ -1632,10 +1641,10 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-mono font-bold text-zinc-200">{stock.symbol}</span>
                         <span className={`text-[10px] font-mono font-bold ${isUp ? 'text-brand-green' : 'text-brand-coral'}`}>
-                          {isUp ? '+' : ''}{stock.changePercent?.toFixed(2)}%
+                          {isUp ? '+' : ''}{typeof stock.changePercent === 'number' ? stock.changePercent.toFixed(2) : '0.00'}%
                         </span>
                       </div>
-                      <p className="text-sm font-mono text-zinc-400">${stock.price?.toFixed(2)}</p>
+                      <p className="text-sm font-mono text-zinc-400">${typeof stock.price === 'number' ? stock.price.toFixed(2) : '—'}</p>
                     </div>
                   );
                 })}
