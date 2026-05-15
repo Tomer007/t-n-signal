@@ -579,6 +579,24 @@ export default function App() {
     const quote = (overrideMarketData || marketData)?.quote;
     const summary = (overrideMarketData || marketData)?.summary;
 
+    // Fetch FMP fundamentals for deeper Graham data
+    let fmpData = { income: [], balance: [], ratios: [], profile: null } as any;
+    try {
+      const fmpRes = await axios.post('/api/fundamentals', { ticker });
+      fmpData = fmpRes.data;
+    } catch {}
+
+    // Build EPS history string from FMP income statements
+    const epsHistory = fmpData.income?.slice(0, 10).map((y: any) => `${y.calendarYear || y.date?.slice(0,4)}: EPS $${y.eps?.toFixed(2) || 'N/A'}, Revenue $${(y.revenue/1e6)?.toFixed(1)}M`).join('\n') || 'NOT AVAILABLE';
+    
+    // Build balance sheet data
+    const latestBalance = fmpData.balance?.[0];
+    const balanceData = latestBalance ? `Current Assets: $${(latestBalance.totalCurrentAssets/1e6)?.toFixed(1)}M, Total Liabilities: $${(latestBalance.totalLiabilities/1e6)?.toFixed(1)}M, Net Current Assets: $${((latestBalance.totalCurrentAssets - latestBalance.totalLiabilities)/1e6)?.toFixed(1)}M, Tangible Book/Share: $${latestBalance.tangibleBookValuePerShare?.toFixed(2) || 'N/A'}` : 'NOT AVAILABLE';
+
+    // Build ratios
+    const latestRatios = fmpData.ratios?.[0];
+    const ratiosData = latestRatios ? `P/E: ${latestRatios.priceEarningsRatio?.toFixed(2) || 'N/A'}, P/B: ${latestRatios.priceToBookRatio?.toFixed(2) || 'N/A'}, Dividend Yield: ${(latestRatios.dividendYield * 100)?.toFixed(2) || '0'}%, Current Ratio: ${latestRatios.currentRatio?.toFixed(2) || 'N/A'}` : 'NOT AVAILABLE';
+
     const grahamPrompt = `You are a value investing analyst applying Benjamin Graham's framework from "The Intelligent Investor" and "Security Analysis." Analyze the following stock against Graham's complete defensive investor criteria and provide a verdict using the EXACT output format specified below.
 
 **STOCK TO ANALYZE:** ${ticker}
@@ -591,15 +609,26 @@ ${JSON.stringify(quote, null, 2)}
 ## FINANCIAL SUMMARY:
 ${JSON.stringify(summary, null, 2)}
 
+## HISTORICAL INCOME STATEMENTS (up to 10 years):
+${epsHistory}
+
+## BALANCE SHEET DATA:
+${balanceData}
+
+## KEY RATIOS:
+${ratiosData}
+
 ---
 
 ## INSTRUCTIONS
-1. Use the market data provided above. Do NOT refuse or say you cannot access data — it is provided.
+1. Use ALL the market data provided above. Do NOT refuse or say you cannot access data — it is provided.
 2. Use AAA corporate bond yield of approximately 5.0% as benchmark (or state if different).
 3. Show calculations explicitly where required.
 4. Follow the OUTPUT FORMAT below exactly — do not deviate from the structure.
 5. Use ✅ for PASS, ❌ for FAIL, ⚠️ for PARTIAL/UNKNOWN.
-6. If a specific data point is not available in the provided data, mark it as ⚠️ UNKNOWN.
+6. If a specific data point is not available in ANY of the provided data blocks, mark it as ⚠️ UNKNOWN.
+7. Calculate 5-year and 10-year EPS growth from the HISTORICAL INCOME STATEMENTS if available.
+8. Calculate Net Current Asset Value from BALANCE SHEET DATA if available.
 
 ---
 
@@ -1490,6 +1519,26 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                         className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs"
                       >
                         ⛶ Expand
+                      </Button>
+                    )}
+                    {grahamContent && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(grahamContent); toast.success('Graham analysis copied!'); }}
+                        className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs"
+                      >
+                        📋 Copy
+                      </Button>
+                    )}
+                    {grahamContent && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(grahamContent); toast.success('Graham analysis copied!'); }}
+                        className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs"
+                      >
+                        📋 Copy
                       </Button>
                     )}
                   </div>
