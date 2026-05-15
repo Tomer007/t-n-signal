@@ -1531,16 +1531,6 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                         📋 Copy
                       </Button>
                     )}
-                    {grahamContent && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(grahamContent); toast.success('Graham analysis copied!'); }}
-                        className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs"
-                      >
-                        📋 Copy
-                      </Button>
-                    )}
                   </div>
                 </div>
               </CardHeader>
