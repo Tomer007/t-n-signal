@@ -586,8 +586,23 @@ export default function App() {
       fmpData = fmpRes.data;
     } catch {}
 
-    // Build EPS history string from FMP income statements
-    const epsHistory = fmpData.income?.slice(0, 10).map((y: any) => `${y.calendarYear || y.date?.slice(0,4)}: EPS $${y.eps?.toFixed(2) || 'N/A'}, Revenue $${(y.revenue/1e6)?.toFixed(1)}M`).join('\n') || 'NOT AVAILABLE';
+    // Fetch SEC EDGAR data (10-year EPS/Revenue history)
+    let edgarData = { eps: [], revenue: [], netIncome: [] } as any;
+    try {
+      const edgarRes = await axios.post('/api/edgar', { ticker });
+      edgarData = edgarRes.data;
+    } catch {}
+
+    // Build EPS history — prefer EDGAR (10yr), fallback to FMP
+    let epsHistory = 'NOT AVAILABLE';
+    if (edgarData.eps?.length > 0) {
+      epsHistory = edgarData.eps.map((d: any) => `${d.year}: EPS $${d.value?.toFixed(2)}`).join('\n');
+      if (edgarData.revenue?.length > 0) {
+        epsHistory += '\n\nRevenue History:\n' + edgarData.revenue.map((d: any) => `${d.year}: $${(d.value / 1e9).toFixed(2)}B`).join('\n');
+      }
+    } else if (fmpData.income?.length > 0) {
+      epsHistory = fmpData.income.slice(0, 10).map((y: any) => `${y.calendarYear || y.date?.slice(0,4)}: EPS $${y.eps?.toFixed(2) || 'N/A'}, Revenue $${(y.revenue/1e6)?.toFixed(1)}M`).join('\n');
+    }
     
     // Build balance sheet data
     const latestBalance = fmpData.balance?.[0];

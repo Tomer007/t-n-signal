@@ -488,9 +488,79 @@ async function startServer() {
   });
 
   // ═══════════════════════════════════════════════════════════════
-  // Market Overview — S&P 500, NASDAQ, Top Movers
+  // SEC EDGAR — Company filings and financial facts (free, no key)
   // ═══════════════════════════════════════════════════════════════
+  app.post('/api/edgar', async (req, res) => {
+    let { ticker } = req.body;
+    if (!ticker) return res.status(400).json({ error: 'Ticker is required' });
+    ticker = String(ticker).trim().toUpperCase();
 
+    const userAgent = 'T&N Signal Research App (contact@tnsignal.com)';
+
+    try {
+      // Step 1: Get CIK from ticker
+      const tickerRes = await axios.get(
+        `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${ticker}&CIK=&type=10-K&dateb=&owner=include&count=1&search_text=&output=atom`,
+        { headers: { 'User-Agent': userAgent }, timeout: 10000 }
+      ).catch(() => null);
+
+      // Step 2: Get company facts (financials from XBRL)
+      const cikLookup = await axios.get(
+        `https://efts.sec.gov/LATEST/search-index?q=%22${ticker}%22&dateRange=custom&startdt=2020-01-01&forms=10-K`,
+        { headers: { 'User-Agent': userAgent }, timeout: 10000 }
+      ).catch(() => null);
+
+      // Step 3: Try the company tickers JSON for CIK mapping
+      const cikMapRes = await axios.get(
+        'https://www.sec.gov/files/company_tickers.json',
+        { headers: { 'User-Agent': userAgent }, timeout: 10000 }
+      ).catch(() => ({ data: {} }));
+
+      let cik = '';
+      if (cikMapRes?.data) {
+        const entries = Object.values(cikMapRes.data) as any[];
+        const match = entries.find((e: any) => e.ticker === ticker);
+        if (match) {
+          cik = String(match.cik_str).padStart(10, '0');
+        }
+      }
+
+      if (!cik) {
+        return res.json({ ticker, cik: null, facts: null, filings: [] });
+      }
+
+      // Step 4: Get company facts (XBRL financial data)
+      const factsRes = await axios.get(
+        `https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`,
+        { headers: { 'User-Agent': userAgent }, timeout: 15000 }
+      ).catch(() => null);
+
+      // Extract key financial facts
+      const facts = factsRes?.data?.facts;
+      const usGaap = facts?.['us-gaap'] || {};
+      
+      // Extract EPS history
+      const epsData = usGaap['EarningsPerShareDiluted']?.units?.['USD/shares'] || [];
+      const revenueData = usGaap['Revenues']?.units?.USD || usGaap['RevenueFromContractWithCustomerExcludingAssessedTax']?.units?.USD || [];
+      const netIncomeData = usGaap['NetIncomeLoss']?.units?.USD || [];
+
+      // Filter to annual (10-K) filings only
+      const annualEps = epsData.filter((d: any) => d.form === '10-K').slice(-10);
+      const annualRevenue = revenueData.filter((d: any) => d.form === '10-K').slice(-10);
+      const annualNetIncome = netIncomeData.filter((d: any) => d.form === '10-K').slice(-10);
+
+      res.json({
+        ticker,
+        cik,
+        eps: annualEps.map((d: any) => ({ year: d.end?.slice(0, 4), value: d.val })),
+        revenue: annualRevenue.map((d: any) => ({ year: d.end?.slice(0, 4), value: d.val })),
+        netIncome: annualNetIncome.map((d: any) => ({ year: d.end?.slice(0, 4), value: d.val })),
+      });
+    } catch (error: any) {
+      console.error('EDGAR Error:', error.message);
+      res.status(500).json({ error: error.message || 'Failed to fetch SEC EDGAR data' });
+    }
+  });
 
   // ═══════════════════════════════════════════════════════════════
   // Market Overview — S&P 500, NASDAQ, Top Movers (cached 60s)
@@ -681,6 +751,7 @@ async function startServer() {
     console.log(`  ├─ Finnhub (FINNHUB_API_KEY):  ${process.env.FINNHUB_API_KEY ? '✅ configured' : '⚠️  missing (no insider data)'}`);
     console.log(`  ├─ FRED (FRED_API_KEY):        ${process.env.FRED_API_KEY ? '✅ configured' : '⚠️  missing (no macro data)'}`);
     console.log(`  ├─ Gemini (GEMINI_API_KEY):    ${process.env.GEMINI_API_KEY ? '✅ configured' : '⚠️  missing (no Hebrew infographic)'}`);
+    console.log(`  ├─ SEC EDGAR:                 ✅ built-in (no key needed)`);
     console.log(`  └─ Yahoo Finance:             ✅ built-in (no key needed)`);
     console.log(``);
     console.log(`  Model: ${process.env.OPENAI_MODEL || 'gpt-4o'}`);
