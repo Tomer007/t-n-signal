@@ -946,6 +946,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                         if (cached.longFormContent) setLongFormContent(cached.longFormContent);
                         if (cached.prompt) setActivePrompt(cached.prompt);
                         toast.success('Loaded from history');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
                       } else {
                         // Try loading from saved reports on server
                         axios.get(`/api/reports/${encodeURIComponent(item)}`).then(res => {
@@ -954,6 +955,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                             if (res.data.content) setLongFormContent(res.data.content);
                             if (res.data.prompt) setActivePrompt(res.data.prompt);
                             toast.success('Loaded from saved reports');
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
                           } else {
                             toast.info('No cached report — click GENERATE to create one');
                           }
