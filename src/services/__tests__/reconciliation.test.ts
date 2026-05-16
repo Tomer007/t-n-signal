@@ -68,7 +68,8 @@ function buildTestInput(overrides: Partial<ReconciliationInput> = {}): Reconcili
     mainVerdict: 'HOLD',
     grahamVerdict: 'AVOID',
     grahamPassCount: 3,
-    grahamTotalCount: 7,
+    grahamKnownCount: 7,
+    compositeScoreStr: '3 / 7 known (0 unknown, 7 total)',
     metrics: defaultMetrics,
     applicability: defaultApplicability,
     ...overrides,
@@ -135,7 +136,7 @@ describe('generateReconciliation', () => {
     expect(result.section).toContain('Verdict Reconciliation');
     expect(result.section).toContain('HOLD');
     expect(result.section).toContain('AVOID');
-    expect(result.section).toContain('3/7 criteria passed');
+    expect(result.section).toContain('3 / 7 known');
   });
 
   it('includes framework limitation when applicability is low', () => {

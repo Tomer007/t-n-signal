@@ -108,11 +108,11 @@ describe('renderGrahamAnalysis — MOS reference data', () => {
     const result1 = renderGrahamAnalysis(input);
     const result2 = renderGrahamAnalysis(input);
     expect(result1.passCount).toBe(result2.passCount);
-    expect(result1.totalCount).toBe(result2.totalCount);
+    expect(result1.knownCount).toBe(result2.knownCount);
     expect(result1.verdict).toBe(result2.verdict);
 
     // Verify it matches gradeScore output
-    const expectedGrade = gradeScore(result1.passCount, result1.totalCount);
+    const expectedGrade = gradeScore(result1.passCount, result1.knownCount);
     const expectedVerdict = verdictFromGrade(expectedGrade.grade);
     expect(result1.verdict).toBe(expectedVerdict);
   });

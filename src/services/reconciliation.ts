@@ -23,7 +23,8 @@ export interface ReconciliationInput {
   mainVerdict: MainVerdict;
   grahamVerdict: GrahamVerdict;
   grahamPassCount: number;
-  grahamTotalCount: number;
+  grahamKnownCount: number;
+  compositeScoreStr: string;
   metrics: CanonicalMetrics;
   applicability: GrahamApplicabilityResult;
   sector?: string;
@@ -80,7 +81,7 @@ export function verdictsRequireReconciliation(
  * the same output. No LLM call needed.
  */
 export function generateReconciliation(input: ReconciliationInput): ReconciliationResult {
-  const { mainVerdict, grahamVerdict, grahamPassCount, grahamTotalCount, metrics, applicability } = input;
+  const { mainVerdict, grahamVerdict } = input;
 
   if (!verdictsRequireReconciliation(mainVerdict, grahamVerdict)) {
     return {
@@ -90,30 +91,39 @@ export function generateReconciliation(input: ReconciliationInput): Reconciliati
     };
   }
 
+  const { grahamPassCount, grahamKnownCount, compositeScoreStr, metrics, applicability } = input;
+  const sectorName = input.sector || 'this';
+
   // Build the reconciliation section
   const lines: string[] = [];
   lines.push('## ⚖️ Verdict Reconciliation');
   lines.push('');
   lines.push(`**Main Verdict:** ${mainVerdict}`);
-  lines.push(`**Graham Analysis:** ${grahamVerdict} (${grahamPassCount}/${grahamTotalCount} criteria passed)`);
+  lines.push(`**Graham Analysis:** ${grahamVerdict} (${compositeScoreStr})`);
   lines.push('');
   lines.push('### Why They Differ');
   lines.push('');
 
-  // Reason 1: Framework applicability
-  if (applicability.level === 'low') {
-    lines.push(`1. **Framework Limitation:** Graham's value framework has "${applicability.level}" applicability to this sector. ${applicability.disclaimer}`);
-    lines.push(`   - Verdict weight: ${(applicability.verdictWeight * 100).toFixed(0)}% (screening signal only)`);
-    lines.push('');
-  } else if (applicability.level === 'medium') {
-    lines.push(`1. **Partial Framework Fit:** Graham's framework has "medium" applicability here. Some criteria may not fully capture the company's value drivers.`);
-    lines.push(`   - Verdict weight: ${(applicability.verdictWeight * 100).toFixed(0)}%`);
-    lines.push('');
+  // Build items as an array, number sequentially at render time
+  const items: string[] = [];
+
+  // Framework applicability — ALWAYS state it (affirm high, explain low/medium)
+  if (applicability.level === 'high') {
+    items.push(
+      `**Framework Applicability:** Graham's framework is highly applicable to this asset-heavy ${sectorName} company — the ${grahamVerdict} signal carries full weight.`
+    );
+  } else if (applicability.level === 'low') {
+    items.push(
+      `**Framework Limitation:** Graham's value framework has "${applicability.level}" applicability to this sector. ${applicability.disclaimer} Verdict weight: ${(applicability.verdictWeight * 100).toFixed(0)}% (screening signal only).`
+    );
+  } else {
+    items.push(
+      `**Partial Framework Fit:** Graham's framework has "medium" applicability here. Some criteria may not fully capture the company's value drivers. Verdict weight: ${(applicability.verdictWeight * 100).toFixed(0)}%.`
+    );
   }
 
-  // Reason 2: Specific metric failures
+  // Specific metric failures
   const failureReasons: string[] = [];
-
   if (metrics.peTrailing !== null && metrics.peTrailing > 15) {
     failureReasons.push(`P/E of ${metrics.peTrailing.toFixed(1)} exceeds Graham's 15× threshold`);
   }
@@ -128,32 +138,34 @@ export function generateReconciliation(input: ReconciliationInput): Reconciliati
   }
 
   if (failureReasons.length > 0) {
-    const reasonNum = applicability.level !== 'high' ? 2 : 1;
-    lines.push(`${reasonNum}. **Key Graham Failures:**`);
-    for (const reason of failureReasons) {
-      lines.push(`   - ${reason}`);
-    }
-    lines.push('');
+    items.push(`**Key Graham Failures:**\n${failureReasons.map(r => `   - ${r}`).join('\n')}`);
   }
 
-  // Reason 3: Why main verdict differs
-  const reasonNum = failureReasons.length > 0 ? 3 : 2;
+  // Why main verdict differs
   if (mainVerdict === 'BUY' || mainVerdict === 'HOLD') {
-    lines.push(`${reasonNum}. **Why "${mainVerdict}" Despite Graham "${grahamVerdict}":**`);
+    const subPoints: string[] = [];
     if (metrics.analystTargetMean !== null && metrics.price !== null && metrics.analystTargetMean > metrics.price) {
       const upside = ((metrics.analystTargetMean - metrics.price) / metrics.price * 100).toFixed(1);
-      lines.push(`   - Analyst consensus target $${metrics.analystTargetMean.toFixed(2)} implies ${upside}% upside`);
+      subPoints.push(`Analyst consensus target $${metrics.analystTargetMean.toFixed(2)} implies ${upside}% upside`);
     }
     if (metrics.epsGrowth5y !== null && metrics.epsGrowth5y.growthPercent > 0) {
-      lines.push(`   - Positive EPS trajectory (${metrics.epsGrowth5y.growthPercent.toFixed(1)}% over ${metrics.epsGrowth5y.windowYears} years)`);
+      subPoints.push(`Positive EPS trajectory (${metrics.epsGrowth5y.growthPercent.toFixed(1)}% over ${metrics.epsGrowth5y.windowYears} years)`);
     }
     if (metrics.dividendYield !== null && metrics.dividendYield > 0.03) {
-      lines.push(`   - Attractive dividend yield (${(metrics.dividendYield * 100).toFixed(2)}%)`);
+      subPoints.push(`Attractive dividend yield (${(metrics.dividendYield * 100).toFixed(2)}%)`);
     }
-    lines.push('');
+    if (subPoints.length > 0) {
+      items.push(`**Why "${mainVerdict}" Despite Graham "${grahamVerdict}":**\n${subPoints.map(s => `   - ${s}`).join('\n')}`);
+    } else {
+      items.push(`**Why "${mainVerdict}" Despite Graham "${grahamVerdict}":** Forward-looking factors (analyst targets, growth trajectory) support a less bearish stance than the backward-looking Graham screen.`);
+    }
   } else {
-    lines.push(`${reasonNum}. **Why "${mainVerdict}" Despite Graham "${grahamVerdict}":**`);
-    lines.push(`   - Additional risk factors beyond Graham's quantitative framework support a more cautious stance.`);
+    items.push(`**Why "${mainVerdict}" Despite Graham "${grahamVerdict}":** Additional risk factors beyond Graham's quantitative framework support a more cautious stance.`);
+  }
+
+  // Render items with sequential numbering
+  for (let i = 0; i < items.length; i++) {
+    lines.push(`${i + 1}. ${items[i]}`);
     lines.push('');
   }
 
@@ -162,8 +174,10 @@ export function generateReconciliation(input: ReconciliationInput): Reconciliati
   lines.push('');
   if (applicability.level === 'low') {
     lines.push(`The Graham "${grahamVerdict}" is a **screening signal only** (${(applicability.verdictWeight * 100).toFixed(0)}% weight) due to framework limitations for this sector. The main "${mainVerdict}" verdict is based on forward-looking analysis that better captures this company's value drivers.`);
+  } else if (applicability.level === 'high') {
+    lines.push(`The Graham "${grahamVerdict}" carries full weight for this asset-heavy sector. The main "${mainVerdict}" verdict incorporates forward-looking factors (analyst targets, growth trajectory) that Graham's backward-looking framework does not capture. Both signals should be weighed seriously.`);
   } else {
-    lines.push(`Both perspectives have merit. The main "${mainVerdict}" verdict incorporates forward-looking factors (analyst targets, growth trajectory, sector dynamics) that Graham's backward-looking framework does not capture. Investors should weigh both signals.`);
+    lines.push(`Both perspectives have merit. The main "${mainVerdict}" verdict incorporates forward-looking factors that Graham's backward-looking framework does not capture. Investors should weigh both signals.`);
   }
 
   const section = lines.join('\n');

@@ -745,7 +745,8 @@ export default function App() {
         mainVerdict: mainVerdict as 'BUY' | 'HOLD' | 'SELL' | 'AVOID',
         grahamVerdict: graham.verdict,
         grahamPassCount: graham.passCount,
-        grahamTotalCount: graham.totalCount,
+        grahamKnownCount: graham.knownCount,
+        compositeScoreStr: graham.compositeScoreStr,
         metrics,
         applicability,
         sector,
@@ -795,7 +796,7 @@ FACTS: ${graham.opinionPromptContext}`;
         // Opinion is decorative — the deterministic report stands on its own.
       }
 
-      addApiLog('Graham', 'ok', `Computed: ${graham.verdict} (${graham.passCount}/${graham.totalCount})`);
+      addApiLog('Graham', 'ok', `Computed: ${graham.verdict} (${graham.passCount}/${graham.knownCount})`);
       toast.success('Graham Analysis complete!');
     } catch (err: any) {
       addApiLog('Graham', 'error', err.message || 'Graham analysis failed');

@@ -47,9 +47,12 @@ export interface GrahamRenderResult {
   markdown: string;
   /** The Graham verdict — feed this into reconciliation */
   verdict: 'BUY' | 'HOLD' | 'AVOID';
-  /** Composite score for reconciliation / validation */
+  /** Composite scores — use these in reconciliation (ONE source of truth) */
   passCount: number;
+  knownCount: number;
+  unknownCount: number;
   totalCount: number;
+  compositeScoreStr: string;
   grahamNumber: number | null;
   /** A short factual prompt the caller MAY send to GPT for the opinion prose only */
   opinionPromptContext: string;
@@ -154,15 +157,22 @@ export function renderGrahamAnalysis(input: GrahamRenderInput): GrahamRenderResu
   const coreGrade = gradeFromResults(coreResults);
   const advancedGrade = gradeFromResults(advancedResults);
 
-  const allResults = [...coreResults, ...advancedResults];
-  const compositeEvaluated = allResults.filter(r => r.result !== 'UNKNOWN');
-  const compositePass = compositeEvaluated.filter(r => r.result === 'PASS').length;
-  const compositeGrade = gradeScore(compositePass, compositeEvaluated.length);
+  // Composite: sum of pass / sum of known
+  const coreKnown = coreGrade.totalCount;
+  const corePass = coreGrade.passCount;
+  const coreUnknown = coreResults.length - coreKnown;
+  const advancedKnown = advancedGrade.totalCount;
+  const advancedPass = advancedGrade.passCount;
+  const advancedUnknown = advancedResults.length - advancedKnown;
 
-  // Count unknowns for display
-  const coreUnknown = coreResults.filter(r => r.result === 'UNKNOWN').length;
-  const advancedUnknown = advancedResults.filter(r => r.result === 'UNKNOWN').length;
+  const compositePass = corePass + advancedPass;
+  const compositeKnown = coreKnown + advancedKnown;
   const compositeUnknown = coreUnknown + advancedUnknown;
+  const compositeTotal = coreResults.length + advancedResults.length;
+  const compositeGrade = gradeScore(compositePass, compositeKnown);
+
+  // ONE canonical score string used everywhere
+  const compositeScoreStr = `${compositePass} / ${compositeKnown} known (${compositeUnknown} unknown, ${compositeTotal} total)`;
   const eps = metrics.epsTTM?.value ?? null;
   const bvps = metrics.bookValuePerShare;
   const gNumber =
@@ -207,7 +217,7 @@ export function renderGrahamAnalysis(input: GrahamRenderInput): GrahamRenderResu
   md.push('');
   md.push(renderCriteriaTable(coreResults, 1));
   md.push('');
-  md.push(`> **🎯 Core Score: ${coreGrade.passCount} / 7** ${coreUnknown > 0 ? `(${coreUnknown} criteria unknown) ` : ''}(Grade: ${coreGrade.grade})`);
+  md.push(`> **🎯 Core Score: ${corePass} / ${coreKnown} known** ${coreUnknown > 0 ? `(${coreUnknown} unknown, ${coreResults.length} total) ` : ''}— Grade ${coreGrade.grade}`);
   md.push('');
   md.push('---');
   md.push('');
@@ -217,7 +227,7 @@ export function renderGrahamAnalysis(input: GrahamRenderInput): GrahamRenderResu
   md.push('');
   md.push(renderCriteriaTable(advancedResults, 1));
   md.push('');
-  md.push(`> **🎯 Advanced Score: ${advancedGrade.passCount} / 10** ${advancedUnknown > 0 ? `(${advancedUnknown} criteria unknown) ` : ''}(Grade: ${advancedGrade.grade})`);
+  md.push(`> **🎯 Advanced Score: ${advancedPass} / ${advancedKnown} known** ${advancedUnknown > 0 ? `(${advancedUnknown} unknown, ${advancedResults.length} total) ` : ''}— Grade ${advancedGrade.grade}`);
   md.push('');
   md.push('---');
   md.push('');
@@ -259,9 +269,9 @@ export function renderGrahamAnalysis(input: GrahamRenderInput): GrahamRenderResu
   md.push('');
   md.push('| Framework | Score | Grade |');
   md.push('|-----------|-------|-------|');
-  md.push(`| 7 Core Defensive Criteria | ${coreGrade.passCount} / 7 | ${coreGrade.grade} |`);
-  md.push(`| 10 Advanced Criteria | ${advancedGrade.passCount} / 10 | ${advancedGrade.grade} |`);
-  md.push(`| **Composite Graham Score** | **${compositeGrade.passCount} / 17** | **${compositeGrade.grade}** |`);
+  md.push(`| 7 Core Defensive | ${corePass} / ${coreKnown} known | ${coreGrade.grade} |`);
+  md.push(`| 10 Advanced | ${advancedPass} / ${advancedKnown} known | ${advancedGrade.grade} |`);
+  md.push(`| **Composite** | **${compositeScoreStr}** | **${compositeGrade.grade}** |`);
   md.push('');
 
   // EPS growth — explicitly labeled with the window used (fixes bug #2)
@@ -280,7 +290,7 @@ export function renderGrahamAnalysis(input: GrahamRenderInput): GrahamRenderResu
   // Factual context the caller can hand to GPT for the OPINION paragraph only
   const opinionPromptContext = [
     `Ticker: ${ticker} (${companyName}), sector ${sector}.`,
-    `Graham composite: ${compositeGrade.passCount}/${compositeGrade.totalCount} criteria passed, grade ${compositeGrade.grade}, verdict ${verdict}.`,
+    `Graham composite: ${compositePass}/${compositeKnown} known criteria passed, grade ${compositeGrade.grade}, verdict ${verdict}.`,
     `Current price ${formatCurrency(metrics.price)}, Graham Number ${formatCurrency(gNumber)}.`,
     epsGrowth5yResult
       ? `5-year EPS growth ${formatPercent(epsGrowth5yResult.growthPercent)}.`
@@ -291,8 +301,11 @@ export function renderGrahamAnalysis(input: GrahamRenderInput): GrahamRenderResu
   return {
     markdown: md.join('\n'),
     verdict,
-    passCount: compositeGrade.passCount,
-    totalCount: compositeGrade.totalCount,
+    passCount: compositePass,
+    knownCount: compositeKnown,
+    unknownCount: compositeUnknown,
+    totalCount: compositeTotal,
+    compositeScoreStr,
     grahamNumber: gNumber,
     opinionPromptContext,
   };
