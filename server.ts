@@ -798,8 +798,7 @@ async function startServer() {
         history = JSON.parse(fs.readFileSync(historyFilePath, 'utf-8'));
       }
 
-      // Remove duplicate, add to front, keep last 50
-      history = history.filter(h => h.query !== query);
+      // Add new entry to front (keep multiple per ticker, max 5 per ticker, 100 total)
       history.unshift({
         query,
         timestamp: new Date().toISOString(),
@@ -807,7 +806,17 @@ async function startServer() {
         longFormContent: longFormContent || null,
         prompt: prompt || null,
       });
-      history = history.slice(0, 50);
+
+      // Limit to 5 entries per ticker
+      const countByTicker: Record<string, number> = {};
+      history = history.filter(h => {
+        const key = h.query.toUpperCase();
+        countByTicker[key] = (countByTicker[key] || 0) + 1;
+        return countByTicker[key] <= 5;
+      });
+
+      // Keep max 100 total entries
+      history = history.slice(0, 100);
 
       fs.writeFileSync(historyFilePath, JSON.stringify(history, null, 2), 'utf-8');
       res.json({ saved: true, history });

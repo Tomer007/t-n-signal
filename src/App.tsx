@@ -222,7 +222,7 @@ export default function App() {
   const [longFormStep, setLongFormStep] = useState('');
   const [activePrompt, setActivePrompt] = useState<string>('');
   const [marketData, setMarketData] = useState<MarketData | null>(null);
-  const [history, setHistory] = useState<string[]>([]);
+  const [history, setHistory] = useState<Array<{ query: string; timestamp: string }>>([]);
   const [historyData, setHistoryData] = useState<Record<string, { report?: AnalysisReport; longFormContent?: string; prompt?: string }>>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showGuide, setShowGuide] = useState(false);
@@ -258,12 +258,14 @@ export default function App() {
   useEffect(() => {
     axios.get('/api/history').then(res => {
       if (res.data.history && Array.isArray(res.data.history)) {
-        setHistory(res.data.history.map((h: { query: string }) => h.query));
+        setHistory(res.data.history.map((h: any) => ({ query: h.query, timestamp: h.timestamp || '' })));
         // Only cache report metadata, skip longFormContent to save memory
         const dataMap: Record<string, { report?: AnalysisReport; longFormContent?: string; prompt?: string }> = {};
         res.data.history.forEach((h: any) => {
+          // Key by query+timestamp for uniqueness
+          const key = h.timestamp ? `${h.query}__${h.timestamp}` : h.query;
           if (h.report) {
-            dataMap[h.query] = { report: h.report, prompt: h.prompt };
+            dataMap[key] = { report: h.report, prompt: h.prompt };
           }
         });
         setHistoryData(dataMap);
@@ -324,7 +326,7 @@ export default function App() {
       setLongFormProgress(0);
       setLongFormStep('Fetching market data sampled...');
       const upperQuery = activeQuery.toUpperCase();
-      setHistory(prev => Array.from(new Set([upperQuery, ...prev])).slice(0, 50));
+      setHistory(prev => [{ query: upperQuery, timestamp: new Date().toISOString() }, ...prev].slice(0, 100));
       
       try {
         const marketRes = await axios.post('/api/market-data', { ticker: activeQuery.toUpperCase() }, { signal: controller.signal });
@@ -934,42 +936,74 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
           <div>
             <div>
               <div className="space-y-0.5">
-                {history.length > 0 ? history.slice(0, 20).map(item => (
-                  <button
-                    key={item}
-                    onClick={() => {
-                      setQuery(item);
-                      // Load cached report if available
-                      const cached = historyData[item];
-                      if (cached?.report) {
-                        setCurrentReport(cached.report);
-                        if (cached.longFormContent) setLongFormContent(cached.longFormContent);
-                        if (cached.prompt) setActivePrompt(cached.prompt);
-                        toast.success('Loaded from history');
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      } else {
-                        // Try loading from saved reports on server
-                        axios.get(`/api/reports/${encodeURIComponent(item)}`).then(res => {
-                          if (res.data?.report) {
-                            setCurrentReport(res.data.report);
-                            if (res.data.content) setLongFormContent(res.data.content);
-                            if (res.data.prompt) setActivePrompt(res.data.prompt);
-                            toast.success('Loaded from saved reports');
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          } else {
-                            toast.info('No cached report — click GENERATE to create one');
-                          }
-                        }).catch(() => {
-                          toast.info('No cached report — click GENERATE to create one');
-                        });
-                      }
-                    }}
-                    className="w-full text-left px-2 py-1.5 rounded-md text-xs text-white/60 hover:text-white hover:bg-white/5 transition-all flex items-center justify-between group truncate"
-                  >
-                    <span>{item}</span>
-                    <TrendingUp className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-brand-green" />
-                  </button>
-                )) : (
+                {history.length > 0 ? (() => {
+                  // Group by ticker
+                  const groups: Record<string, Array<{ query: string; timestamp: string }>> = {};
+                  history.slice(0, 50).forEach(item => {
+                    const key = item.query.toUpperCase();
+                    if (!groups[key]) groups[key] = [];
+                    groups[key].push(item);
+                  });
+                  // Render grouped — most recent ticker first
+                  const tickerOrder = Object.keys(groups);
+                  return tickerOrder.map(ticker => (
+                    <div key={ticker} className="mb-1">
+                      {groups[ticker].length > 1 ? (
+                        <>
+                          <p className="text-[9px] text-white/30 uppercase tracking-wider px-2 pt-2 pb-0.5 font-bold">{ticker}</p>
+                          {groups[ticker].map((item, idx) => {
+                            const dateStr = item.timestamp ? new Date(item.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                            const histKey = item.timestamp ? `${item.query}__${item.timestamp}` : item.query;
+                            return (
+                              <button
+                                key={histKey}
+                                onClick={() => {
+                                  setQuery(item.query);
+                                  const cached = historyData[histKey] || historyData[item.query];
+                                  if (cached?.report) {
+                                    setCurrentReport(cached.report);
+                                    if (cached.longFormContent) setLongFormContent(cached.longFormContent);
+                                    if (cached.prompt) setActivePrompt(cached.prompt);
+                                    toast.success('Loaded from history');
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                  } else {
+                                    toast.info('No cached report — click GENERATE to create one');
+                                  }
+                                }}
+                                className="w-full text-left px-2 pl-4 py-1 rounded-md text-[11px] text-white/50 hover:text-white hover:bg-white/5 transition-all flex items-center justify-between group"
+                              >
+                                <span className="text-white/40">{dateStr || `Run ${idx + 1}`}</span>
+                                <TrendingUp className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100 transition-opacity text-brand-green" />
+                              </button>
+                            );
+                          })}
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            const item = groups[ticker][0];
+                            setQuery(item.query);
+                            const histKey = item.timestamp ? `${item.query}__${item.timestamp}` : item.query;
+                            const cached = historyData[histKey] || historyData[item.query];
+                            if (cached?.report) {
+                              setCurrentReport(cached.report);
+                              if (cached.longFormContent) setLongFormContent(cached.longFormContent);
+                              if (cached.prompt) setActivePrompt(cached.prompt);
+                              toast.success('Loaded from history');
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            } else {
+                              toast.info('No cached report — click GENERATE to create one');
+                            }
+                          }}
+                          className="w-full text-left px-2 py-1.5 rounded-md text-xs text-white/60 hover:text-white hover:bg-white/5 transition-all flex items-center justify-between group truncate"
+                        >
+                          <span>{ticker}</span>
+                          <span className="text-[9px] text-white/30 mr-1">{groups[ticker][0].timestamp ? new Date(groups[ticker][0].timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</span>
+                        </button>
+                      )}
+                    </div>
+                  ));
+                })() : (
                   <p className="text-xs text-white/30 px-3 mt-2 italic">No recent history</p>
                 )}
               </div>
@@ -1554,8 +1588,8 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
 
             {/* Share Report — below Key Catalysts */}
             {currentReport && (
-              <div className="flex items-center justify-center gap-3 py-6">
-                <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mr-2">Share Report</span>
+              <div className="flex items-center justify-center gap-3 py-6 px-4 bg-zinc-900/30 rounded-xl border border-zinc-800/50">
+                <span className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold mr-2">📤 Share</span>
                 <Button variant="outline" size="sm" onClick={() => {
                   const r = currentReport;
                   if (!r) return;
@@ -1564,7 +1598,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                   const subject = encodeURIComponent(`T&N Signal: ${r.ticker} — ${r.recommendation} (${date})`);
                   const body = encodeURIComponent(text);
                   window.open(`mailto:?subject=${subject}&body=${body}`);
-                }} className="border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white">
+                }} className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white">
                   ✉️ Email
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => {
@@ -1573,7 +1607,7 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                   const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
                   const text = `📊 *T&N Signal: ${r.ticker}*\n📅 ${date}\n\n🎯 Verdict: *${r.recommendation}*\n💰 Entry: ${r.priceTargets.entry} | Exit: ${r.priceTargets.exit}\n📈 Confidence: ${safeNum(r.confidence)}% | Risk: ${safeNum(r.riskScore)}/100\n\n${r.summary}\n\n⚠️ _Not financial advice._`;
                   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`);
-                }} className="border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white">
+                }} className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white">
                   💬 WhatsApp
                 </Button>
               </div>
