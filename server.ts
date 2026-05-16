@@ -258,54 +258,150 @@ async function startServer() {
     // Sanitize: trim, uppercase, limit length
     ticker = String(ticker).trim().toUpperCase().slice(0, 20);
 
+    // Helper: retry a function with exponential backoff
+    async function withRetry<T>(fn: () => Promise<T>, retries = 2, delayMs = 1500): Promise<T | null> {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          return await fn();
+        } catch (e: any) {
+          const is429 = e.message?.includes('429') || e.message?.includes('Too Many Requests');
+          if (is429 && attempt < retries) {
+            console.warn(`Rate limited (attempt ${attempt + 1}/${retries + 1}), waiting ${delayMs}ms...`);
+            await new Promise(r => setTimeout(r, delayMs * (attempt + 1)));
+          } else {
+            throw e;
+          }
+        }
+      }
+      return null;
+    }
+
+    let dataSource = '';
+
     try {
-      // First try to find the actual ticker if it's not a clear symbol
-      const isTickerLikely = /^[A-Z]{1,5}(\.[A-Z]{2,})?$/.test(ticker);
-      if (!isTickerLikely || ticker.split(' ').length > 1) {
-        const searchResults: any = await yahooFinance.search(ticker);
-        if (searchResults.quotes && searchResults.quotes.length > 0) {
-          // Prefer EQUITY or ETF
-          const bestMatch = searchResults.quotes.find((q: any) => q.quoteType === 'EQUITY' || q.quoteType === 'ETF') || searchResults.quotes[0];
-          ticker = bestMatch.symbol;
+      // ─── Strategy: Try FMP first (no rate limits), then Yahoo as fallback ───
+      const FMP_API_KEY = process.env.FMP_API_KEY;
+
+      // ATTEMPT 1: FMP (reliable, no rate limits)
+      if (FMP_API_KEY) {
+        try {
+          const baseUrl = 'https://financialmodelingprep.com/api/v3';
+          const [profileRes, ratiosRes] = await Promise.all([
+            axios.get(`${baseUrl}/profile/${ticker}?apikey=${FMP_API_KEY}`).catch(() => ({ data: [] })),
+            axios.get(`${baseUrl}/ratios/${ticker}?period=annual&limit=1&apikey=${FMP_API_KEY}`).catch(() => ({ data: [] })),
+          ]);
+
+          const profile = profileRes.data?.[0];
+          if (profile && profile.price) {
+            dataSource = 'FMP';
+            const fmpQuote = {
+              symbol: ticker,
+              shortName: profile.companyName || ticker,
+              regularMarketPrice: profile.price,
+              marketCap: profile.mktCap,
+              trailingPE: profile.pe || null,
+              forwardPE: null,
+              epsTrailingTwelveMonths: profile.eps || null,
+              fiftyTwoWeekHigh: profile.range ? parseFloat(profile.range.split('-')[1]) : null,
+              fiftyTwoWeekLow: profile.range ? parseFloat(profile.range.split('-')[0]) : null,
+              beta: profile.beta,
+              sharesOutstanding: profile.mktCap && profile.price ? Math.round(profile.mktCap / profile.price) : null,
+              averageAnalystRating: null,
+            };
+            const ratios = ratiosRes.data?.[0];
+            const fmpSummary = {
+              summaryDetail: {
+                trailingAnnualDividendYield: profile.lastDiv ? profile.lastDiv / (profile.price || 1) : null,
+                trailingAnnualDividendRate: profile.lastDiv || null,
+              },
+              defaultKeyStatistics: {
+                bookValue: null,
+                priceToBook: ratios?.priceToBookRatio || null,
+                beta: profile.beta,
+              },
+              financialData: {
+                currentRatio: ratios?.currentRatio || null,
+                debtToEquity: ratios?.debtEquityRatio || null,
+                profitMargins: ratios?.netProfitMargin || null,
+                revenueGrowth: null,
+                targetMeanPrice: profile.dcf || null,
+                totalDebt: null,
+              },
+            };
+            return res.json({ quote: fmpQuote, summary: fmpSummary, history: [], source: 'FMP' });
+          }
+        } catch (fmpErr: any) {
+          console.warn(`FMP failed for ${ticker}:`, fmpErr.message?.slice(0, 100));
         }
       }
 
-      // Parallelize calls for speed and robustness
-      const [quote, summary, history] = await Promise.all([
-        (yahooFinance.quote(ticker) as any).catch((e: any) => {
-          if (!e.message.includes('validation')) {
-            console.warn(`Quote failed for ${ticker}:`, e.message);
+      // ATTEMPT 2: Yahoo Finance (with retry on 429)
+      // First try to find the actual ticker if it's not a clear symbol
+      const isTickerLikely = /^[A-Z]{1,5}(\.[A-Z]{2,})?$/.test(ticker);
+      if (!isTickerLikely || ticker.split(' ').length > 1) {
+        try {
+          const searchResults: any = await yahooFinance.search(ticker);
+          if (searchResults.quotes && searchResults.quotes.length > 0) {
+            const bestMatch = searchResults.quotes.find((q: any) => q.quoteType === 'EQUITY' || q.quoteType === 'ETF') || searchResults.quotes[0];
+            ticker = bestMatch.symbol;
           }
-          return null;
-        }),
-        (yahooFinance.quoteSummary(ticker, {
-          modules: ['summaryDetail', 'defaultKeyStatistics', 'financialData', 'price']
-        }) as any).catch((e: any) => {
-          if (!e.message.includes('validation')) {
-            console.warn(`Summary failed for ${ticker}:`, e.message);
-          }
-          return null;
-        }),
-        (yahooFinance.historical(ticker, {
-          period1: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000), // 6 months
-          period2: new Date(),
-          interval: '1d'
-        }) as any).catch((e: any) => {
-          if (!e.message.includes('validation')) {
-            console.warn(`History failed for ${ticker}:`, e.message);
-          }
-          return [];
-        })
-      ]);
-
-      if (!quote && !summary) {
-        throw new Error(`Could not find any data for ticker: ${ticker}`);
+        } catch (searchErr: any) {
+          console.warn(`Search failed for ${ticker}:`, searchErr.message?.slice(0, 80));
+        }
       }
 
-      res.json({ quote, summary, history });
+      const quote = await withRetry(() => (yahooFinance.quote(ticker) as any)).catch((e: any) => {
+        console.warn(`Quote failed for ${ticker}:`, e.message?.slice(0, 100));
+        return null;
+      });
+
+      const summary = await withRetry(() => (yahooFinance.quoteSummary(ticker, {
+        modules: ['summaryDetail', 'defaultKeyStatistics', 'financialData', 'price']
+      }) as any)).catch((e: any) => {
+        console.warn(`Summary failed for ${ticker}:`, e.message?.slice(0, 100));
+        return null;
+      });
+
+      const history = await (yahooFinance.historical(ticker, {
+        period1: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
+        period2: new Date(),
+        interval: '1d'
+      }) as any).catch(() => []);
+
+      if (quote || summary) {
+        return res.json({ quote, summary, history, source: 'Yahoo Finance' });
+      }
+
+      // ─── Both providers failed ───
+      const hasYahoo429 = true; // If we got here, Yahoo likely 429'd
+      const hasFmpKey = !!FMP_API_KEY;
+
+      let userMessage = `Unable to fetch data for ${ticker}. `;
+      if (!hasFmpKey) {
+        userMessage += 'Yahoo Finance is temporarily rate-limiting requests from this server. Configure an FMP API key for reliable fallback. Please try again in 30 seconds.';
+      } else {
+        userMessage += 'Both Yahoo Finance (rate limited) and FMP returned no data for this ticker. Please verify the ticker symbol is correct and try again in 30 seconds.';
+      }
+
+      res.status(503).json({ 
+        error: userMessage,
+        ticker,
+        retryAfterSeconds: 30,
+        reason: 'rate_limited',
+      });
     } catch (error: any) {
       console.error('Error fetching market data:', error);
-      res.status(500).json({ error: error.message || 'Failed to fetch market data' });
+      const is429 = error.message?.includes('429') || error.message?.includes('Too Many Requests');
+      if (is429) {
+        res.status(503).json({ 
+          error: `Market data providers are temporarily rate-limiting requests. Please wait 30 seconds and try again for ${ticker}.`,
+          ticker,
+          retryAfterSeconds: 30,
+          reason: 'rate_limited',
+        });
+      } else {
+        res.status(500).json({ error: error.message || 'Failed to fetch market data' });
+      }
     }
   });
 
