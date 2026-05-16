@@ -52,6 +52,23 @@ function safeNum(val: any, fallback: number = 0): number {
   return fallback;
 }
 
+/** Extract just the price from a target string like "$21.76 (justification: ...)" */
+function extractPrice(target: string): { price: string; detail: string } {
+  if (!target) return { price: '—', detail: '' };
+  const match = target.match(/^(\$[\d,]+(?:\.\d+)?)/);
+  if (match) {
+    const price = match[1];
+    const detail = target.slice(price.length).replace(/^\s*\(/, '').replace(/\)$/, '').trim();
+    return { price, detail };
+  }
+  // If no $ prefix, try to find any price-like pattern
+  const anyPrice = target.match(/\$[\d,]+(?:\.\d+)?/);
+  if (anyPrice) {
+    return { price: anyPrice[0], detail: target.replace(anyPrice[0], '').replace(/[()]/g, '').trim() };
+  }
+  return { price: target.length > 10 ? target.slice(0, 10) + '…' : target, detail: '' };
+}
+
 /** Derives sentiment label from score (0=bearish, 100=bullish) */
 export function getSentimentLabel(score: number): string {
   if (score < 30) return 'Bearish';
@@ -523,8 +540,8 @@ export default function App() {
     <h2>Price Targets</h2>
     <div class="card">
       <div class="targets">
-        <div><div class="price" style="color:#1D9E75">${r.priceTargets.entry}</div><div class="price-label">Entry Target</div></div>
-        <div><div class="price" style="color:#185FA5">${r.priceTargets.exit}</div><div class="price-label">Exit Target</div></div>
+        <div><div class="price" style="color:#1D9E75">${r.priceTargets.entry.match(/^\$[\d,]+(?:\.\d+)?/)?.[0] || r.priceTargets.entry}</div><div class="price-label">Entry Target</div></div>
+        <div><div class="price" style="color:#185FA5">${r.priceTargets.exit.match(/^\$[\d,]+(?:\.\d+)?/)?.[0] || r.priceTargets.exit}</div><div class="price-label">Exit Target</div></div>
       </div>
     </div>
   </div>
@@ -1311,11 +1328,17 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                 <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-6 md:border-l md:border-white/20 md:pl-10">
                   <div className="text-center md:text-left">
                     <p className="text-[10px] font-bold uppercase mb-1" style={{ color: 'rgba(255,255,255,0.7)' }}>Entry</p>
-                    <p className="text-2xl md:text-3xl font-mono font-bold text-brand-green">{currentReport.priceTargets.entry}</p>
+                    <p className="text-2xl md:text-3xl font-mono font-bold text-brand-green">{extractPrice(currentReport.priceTargets.entry).price}</p>
+                    {extractPrice(currentReport.priceTargets.entry).detail && (
+                      <p className="text-[9px] mt-1 max-w-[140px] leading-tight" style={{ color: 'rgba(255,255,255,0.4)' }}>{extractPrice(currentReport.priceTargets.entry).detail}</p>
+                    )}
                   </div>
                   <div className="text-center md:text-left">
                     <p className="text-[10px] font-bold uppercase mb-1" style={{ color: 'rgba(255,255,255,0.7)' }}>Exit</p>
-                    <p className="text-2xl md:text-3xl font-mono font-bold text-brand-blue">{currentReport.priceTargets.exit}</p>
+                    <p className="text-2xl md:text-3xl font-mono font-bold text-brand-blue">{extractPrice(currentReport.priceTargets.exit).price}</p>
+                    {extractPrice(currentReport.priceTargets.exit).detail && (
+                      <p className="text-[9px] mt-1 max-w-[140px] leading-tight" style={{ color: 'rgba(255,255,255,0.4)' }}>{extractPrice(currentReport.priceTargets.exit).detail}</p>
+                    )}
                   </div>
                   <div className="text-center md:text-left">
                     <p className="text-[10px] font-bold uppercase mb-1" style={{ color: 'rgba(255,255,255,0.7)' }}>Confidence</p>
