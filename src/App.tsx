@@ -1588,16 +1588,16 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
 
             {/* Share Report — below Key Catalysts */}
             {currentReport && (
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-navy via-zinc-900 to-brand-navy border border-white/10 p-6">
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(29,158,117,0.08),transparent_60%)]" />
+              <div className="relative overflow-hidden rounded-2xl p-6" style={{ background: 'linear-gradient(to right, #0a1628, #18181b, #0a1628)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at top right, rgba(29,158,117,0.08), transparent 60%)' }} />
                 <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                    <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
                       <span className="text-lg">📤</span>
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-white">Share This Report</p>
-                      <p className="text-[11px] text-zinc-400">Send the {currentReport.ticker} analysis to your team</p>
+                      <p className="text-sm font-bold" style={{ color: '#ffffff' }}>Share This Report</p>
+                      <p className="text-[11px]" style={{ color: '#a1a1aa' }}>Send the {currentReport.ticker} analysis to your team</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1609,9 +1609,9 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                       const subject = encodeURIComponent(`T&N Signal: ${r.ticker} — ${r.recommendation} (${date})`);
                       const body = encodeURIComponent(text);
                       window.open(`mailto:?subject=${subject}&body=${body}`);
-                    }} className="group flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer">
+                    }} className="group flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)' }}>
                       <span className="text-base group-hover:scale-110 transition-transform">✉️</span>
-                      <span className="text-sm font-medium text-zinc-300 group-hover:text-white transition-colors">Email</span>
+                      <span className="text-sm font-medium" style={{ color: '#d4d4d8' }}>Email</span>
                     </button>
                     <button onClick={() => {
                       const r = currentReport;
@@ -1619,9 +1619,9 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                       const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
                       const text = `📊 *T&N Signal: ${r.ticker}*\n📅 ${date}\n\n🎯 Verdict: *${r.recommendation}*\n💰 Entry: ${r.priceTargets.entry} | Exit: ${r.priceTargets.exit}\n📈 Confidence: ${safeNum(r.confidence)}% | Risk: ${safeNum(r.riskScore)}/100\n\n${r.summary}\n\n⚠️ _Not financial advice._`;
                       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`);
-                    }} className="group flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#25D366]/10 border border-[#25D366]/20 hover:bg-[#25D366]/20 hover:border-[#25D366]/40 transition-all duration-200 cursor-pointer">
+                    }} className="group flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer" style={{ background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.25)' }}>
                       <span className="text-base group-hover:scale-110 transition-transform">💬</span>
-                      <span className="text-sm font-medium text-[#25D366] group-hover:text-[#2EE676] transition-colors">WhatsApp</span>
+                      <span className="text-sm font-medium" style={{ color: '#25D366' }}>WhatsApp</span>
                     </button>
                   </div>
                 </div>
