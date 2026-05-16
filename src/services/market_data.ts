@@ -252,6 +252,22 @@ export class MarketDataService {
 
       data.dividend_yield = safeNumber(summaryDetail.trailingAnnualDividendYield);
       data.dividend_per_share = safeNumber(summaryDetail.trailingAnnualDividendRate);
+
+      // Balance sheet from Yahoo's balanceSheetHistory (if available)
+      const balanceSheetStatements = (summary as any).balanceSheetHistory?.balanceSheetStatements;
+      if (Array.isArray(balanceSheetStatements) && balanceSheetStatements.length > 0) {
+        const latestBS = balanceSheetStatements[0];
+        data.current_assets = data.current_assets || safeNumber(latestBS.totalCurrentAssets);
+        data.current_liabilities = data.current_liabilities || safeNumber(latestBS.totalCurrentLiabilities);
+      }
+
+      // Fallback: derive current_assets from currentRatio × current_liabilities (or vice versa)
+      if (data.current_assets === null && data.current_ratio !== null && data.current_liabilities !== null && data.current_liabilities > 0) {
+        data.current_assets = data.current_ratio * data.current_liabilities;
+      }
+      if (data.current_liabilities === null && data.current_ratio !== null && data.current_assets !== null && data.current_ratio > 0) {
+        data.current_liabilities = data.current_assets / data.current_ratio;
+      }
     }
 
     return data;

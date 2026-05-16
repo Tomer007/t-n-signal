@@ -359,7 +359,7 @@ async function startServer() {
       });
 
       const summary = await withRetry(() => (yahooFinance.quoteSummary(ticker, {
-        modules: ['summaryDetail', 'defaultKeyStatistics', 'financialData', 'price', 'assetProfile']
+        modules: ['summaryDetail', 'defaultKeyStatistics', 'financialData', 'price', 'assetProfile', 'balanceSheetHistory']
       }) as any)).catch((e: any) => {
         console.warn(`Summary failed for ${ticker}:`, e.message?.slice(0, 100));
         return null;

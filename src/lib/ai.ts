@@ -5,7 +5,7 @@ import { buildSectionPrompt, computeFinancialHealth } from '../prompts/sectionPr
 import { generateLockedThesis } from '../services/thesisGenerator';
 import { buildCanonicalMetrics } from '../services/canonicalMetrics';
 import { MarketDataService } from '../services/market_data';
-import { formatCurrency, formatRatio, formatPercent } from '../utils/formatNumber';
+import { formatCurrency, formatRatio, formatPercent, formatMarketCap } from '../utils/formatNumber';
 
 /** Validates that a parsed object has the required AnalysisReport shape */
 export function validateReport(data: unknown): AnalysisReport {
@@ -142,6 +142,30 @@ export async function generateShortReport(data: MarketData, newsData: NewsItem[]
   // Compute field completeness for confidence
   const total = Object.keys(fields).length;
   const populated = Object.values(fields).filter(v => v !== 'UNKNOWN').length;
+  const confidence = Math.round((populated / total) * 100);
+
+  // ─── Build metrics array IN CODE (not GPT) ───
+  const verified = new MarketDataService().extractFromYahoo(query, data.quote, data.summary);
+  const canonical = buildCanonicalMetrics(verified);
+
+  const codeMetrics: { label: string; value: string; status: 'positive' | 'negative' | 'neutral' }[] = [
+    { label: 'Current Price', value: formatCurrency(canonical.price), status: 'neutral' },
+    { label: 'Market Cap', value: formatMarketCap(data.quote?.marketCap ?? null), status: 'neutral' },
+    { label: 'Trailing P/E', value: formatRatio(canonical.peTrailing), status: canonical.peTrailing !== null ? (canonical.peTrailing <= 20 ? 'positive' : canonical.peTrailing >= 50 ? 'negative' : 'neutral') : 'neutral' },
+    { label: 'Forward P/E', value: formatRatio(canonical.peForward), status: canonical.peForward !== null ? (canonical.peForward <= 15 ? 'positive' : 'neutral') : 'neutral' },
+    { label: 'Dividend Yield', value: formatPercent(canonical.dividendYield, 2, true), status: canonical.dividendYield !== null ? (canonical.dividendYield > 0.03 ? 'positive' : 'neutral') : 'neutral' },
+    { label: 'Beta', value: formatRatio(verified.beta), status: verified.beta !== null ? (verified.beta > 1.5 ? 'negative' : verified.beta < 0.8 ? 'positive' : 'neutral') : 'neutral' },
+    { label: 'Debt to Equity', value: formatRatio(verified.debt_to_equity), status: verified.debt_to_equity !== null ? (verified.debt_to_equity > 100 ? 'negative' : 'neutral') : 'neutral' },
+    { label: 'Current Ratio', value: formatRatio(canonical.currentRatio), status: canonical.currentRatio !== null ? (canonical.currentRatio >= 1.5 ? 'positive' : canonical.currentRatio < 1.0 ? 'negative' : 'neutral') : 'neutral' },
+    { label: 'Profit Margin', value: formatPercent(verified.profit_margin, 2, true), status: verified.profit_margin !== null ? (verified.profit_margin > 0.1 ? 'positive' : verified.profit_margin < 0 ? 'negative' : 'neutral') : 'neutral' },
+  ].filter(m => m.value !== 'N/A');
+
+  // ─── Build price targets IN CODE ───
+  const analystTarget = canonical.analystTargetMean;
+  const codePriceTargets = {
+    entry: analystTarget !== null ? `${formatCurrency(analystTarget * 0.90)} (10% below analyst consensus ${formatCurrency(analystTarget)})` : 'UNKNOWN — insufficient data',
+    exit: analystTarget !== null ? `${formatCurrency(analystTarget)} (analyst consensus mean)` : 'UNKNOWN — insufficient data',
+  };
 
   const verifiedDataBlock = `<verified_data>\n${Object.entries(fields).map(([k, v]) => `${k}: ${v}`).join('\n')}\n</verified_data>`;
   const newsBlock = `<recent_news>\n${newsData.slice(0, 8).map(n => `- ${n.title} (${n.publisher})`).join('\n')}\n</recent_news>`;
@@ -162,7 +186,17 @@ export async function generateShortReport(data: MarketData, newsData: NewsItem[]
       console.error("JSON Parse Error — raw response:", res.data.result?.slice(0, 500));
       throw new Error("AI returned malformed JSON. Please try again.");
     }
-    return { report: validateReport(parsed), prompt };
+    const gptReport = validateReport(parsed);
+
+    // Merge: code-computed numbers + GPT prose
+    const finalReport: typeof gptReport = {
+      ...gptReport,
+      metrics: codeMetrics,
+      priceTargets: codePriceTargets,
+      confidence,
+    };
+
+    return { report: finalReport, prompt };
   } catch (err: any) {
     console.error("Analysis Error:", err);
     throw new Error(err.message || "Failed to generate research report with T&N Signal AI.");
