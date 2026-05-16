@@ -1,6 +1,11 @@
 import axios from "axios";
 import { AnalysisReport, MarketData, NewsItem } from "../types";
 import { buildShortReportPrompt } from "../prompts/shortReportPrompt";
+import { buildSectionPrompt, computeFinancialHealth } from '../prompts/sectionPrompt';
+import { generateLockedThesis } from '../services/thesisGenerator';
+import { buildCanonicalMetrics } from '../services/canonicalMetrics';
+import { MarketDataService } from '../services/market_data';
+import { formatCurrency, formatRatio, formatPercent } from '../utils/formatNumber';
 
 /** Validates that a parsed object has the required AnalysisReport shape */
 export function validateReport(data: unknown): AnalysisReport {
@@ -203,34 +208,63 @@ export async function* generateLongFormReport(data: MarketData, newsData: NewsIt
 
   yield { step: "Initializing T&N Signal Engine...", progress: 5, content: fullReport, prompt: finalPromptHeader };
 
+  // ─── Generate locked thesis ONCE (shared by all sections) ───
+  const verified = new MarketDataService().extractFromYahoo(query, data.quote, data.summary);
+  const metrics = buildCanonicalMetrics(verified);
+
+  let thesis;
+  try {
+    thesis = await generateLockedThesis(verified, '/api/analyze');
+  } catch (e) {
+    // Fallback thesis when API is unavailable (e.g. in tests)
+    thesis = {
+      verdict: 'HOLD' as const,
+      priceTarget12m: metrics.analystTargetMean ?? (metrics.price ?? 0),
+      priceTarget36m: null,
+      confidenceScore: 30,
+      confidenceReasoning: 'Thesis generation failed — using fallback.',
+      thesisOneLiner: `${query} analysis with limited thesis data.`,
+    };
+  }
+
+  // ─── Pre-formatted metrics block (NOT raw JSON) ───
+  const metricsBlock = [
+    `Current Price: ${formatCurrency(metrics.price)}`,
+    `Trailing P/E: ${formatRatio(metrics.peTrailing)}`,
+    `Forward P/E: ${formatRatio(metrics.peForward)}`,
+    `EPS (TTM): ${formatCurrency(metrics.epsTTM?.value ?? null)}`,
+    `Book Value / Share: ${formatCurrency(metrics.bookValuePerShare)}`,
+    `Current Ratio: ${formatRatio(metrics.currentRatio)}`,
+    `Total Debt: ${formatCurrency(metrics.totalDebt)}`,
+    `Dividend Yield: ${formatPercent(metrics.dividendYield, 2, true)}`,
+    `52-Week High: ${formatCurrency(metrics.week52High)}`,
+    `52-Week Low: ${formatCurrency(metrics.week52Low)}`,
+    `Analyst Target Mean: ${formatCurrency(metrics.analystTargetMean)}`,
+  ].join('\n');
+
   for (let i = 0; i < sections.length; i++) {
     const sectionTitle = sections[i];
     yield { step: `Synthesizing ${sectionTitle}...`, progress: 10 + (i / sections.length) * 85, content: fullReport, prompt: finalPromptHeader };
 
-    const sectionPrompt = `You are "T&N Signal", a Senior Equity Research Analyst. 
-    Write the following section of the report: ${sectionTitle}
-    
-    REPORT CONTEXT:
-    ${finalPromptHeader}
-    
-    AVAILABLE MARKET DATA:
-    <verified_data>
-    ${JSON.stringify(data.quote, null, 2)}
-    ${JSON.stringify(data.summary, null, 2)}
-    </verified_data>
-    
-    CRITICAL: You may ONLY cite numbers from <verified_data>. For anything else, write "UNKNOWN — verification required." Do NOT invent citations.
-    
-    LATEST NEWS:
-    ${newsData.slice(0, 10).map(n => `- ${n.title} (${n.publisher})`).join('\n')}
-    
-    REQUIREMENTS:
-    - Use Institutional Grade language.
-    - Be prose-heavy (600+ words for this section).
-    - Use Markdown tables for any comparison.
-    - Follow all Ground Rules in the header.
-    - Use H2 for the section title.
-    - Do not include the report header or disclaimer in this section, it is handled globally.`;
+    // ─── Build section prompt using locked thesis ───
+    let precomputedBlock: string | undefined;
+    if (sectionTitle.toUpperCase().includes('FINANCIAL HEALTH')) {
+      precomputedBlock = computeFinancialHealth(metrics).scorecardTable;
+    }
+
+    const needsNews = /MACRO|INDUSTRY|CATALYST/i.test(sectionTitle);
+    const newsBlock = needsNews
+      ? newsData.slice(0, 10).map(n => `- ${n.title} (${n.publisher}, ${new Date(n.providerPublishTime * 1000).toISOString().slice(0, 10)})`).join('\n')
+      : undefined;
+
+    const sectionPrompt = buildSectionPrompt({
+      sectionTitle,
+      ticker: query,
+      thesis,
+      metricsBlock,
+      precomputedBlock,
+      newsBlock,
+    });
 
     try {
       const response = await fetch('/api/analyze', {
