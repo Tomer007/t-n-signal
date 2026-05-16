@@ -49,6 +49,7 @@ import { buildCanonicalMetrics } from './services/canonicalMetrics';
 import { renderGrahamAnalysis } from './services/grahamRenderer';
 import { generateReconciliation } from './services/reconciliation';
 import { getGrahamApplicability } from './services/frameworkApplicability';
+import { useTranslation } from 'react-i18next';
 
 /** Safely converts a value to a displayable number */
 function safeNum(val: any, fallback: number = 0): number {
@@ -309,6 +310,24 @@ export default function App() {
   }, [showTerminal]);
 
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+
+  // i18n language + RTL
+  const { t, i18n } = useTranslation();
+  const isRTL = i18n.language === 'he';
+
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'en' ? 'he' : 'en';
+    i18n.changeLanguage(newLang);
+    localStorage.setItem('tn-signal-lang', newLang);
+    document.documentElement.dir = newLang === 'he' ? 'rtl' : 'ltr';
+    document.documentElement.lang = newLang;
+  };
+
+  // Set initial direction on mount
+  useEffect(() => {
+    document.documentElement.dir = i18n.language === 'he' ? 'rtl' : 'ltr';
+    document.documentElement.lang = i18n.language;
+  }, [i18n.language]);
 
   // Theme-aware button class helper to reduce duplication
   const ghostBtnClass = theme === 'dark' ? 'text-white/60 hover:text-white hover:bg-white/5' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100';
@@ -1022,6 +1041,15 @@ FACTS: ${graham.opinionPromptContext}`;
                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
              >
                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+             </Button>
+             <Button
+               variant="ghost"
+               size="sm"
+               onClick={toggleLanguage}
+               className={`${ghostBtnClass} text-xs font-bold`}
+               title="Switch language"
+             >
+               {i18n.language === 'en' ? 'עב' : 'EN'}
              </Button>
              <Button
                variant="ghost"

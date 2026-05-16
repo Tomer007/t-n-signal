@@ -1,0 +1,99 @@
+{
+  "brand": "T&N Signal",
+  "nav": {
+    "research": "מחקר מניות",
+    "terminal": "טרמינל",
+    "info": "מידע",
+    "guide": "מדריך",
+    "logout": "התנתק"
+  },
+  "hero": {
+    "tagline": "מוצאים את האות מאחורי רעש השוק",
+    "subtitle": "מחקר מניות ברמה מוסדית מונע בינה מלאכותית תוך שניות",
+    "placeholder": "חפש מניה, תעודת סל או סקטור..."
+  },
+  "buttons": {
+    "generate": "הפק דוח",
+    "deepResearch": "מחקר מעמיק",
+    "cancel": "ביטול",
+    "newSearch": "חיפוש חדש →",
+    "exportReport": "ייצוא דוח",
+    "downloadMd": "הורד MD",
+    "copy": "העתק",
+    "expand": "הרחב"
+  },
+  "login": {
+    "title": "T&N Signal",
+    "subtitle": "מחקר מניות ברמה מוסדית",
+    "username": "שם משתמש",
+    "password": "סיסמה",
+    "submit": "כניסה למערכת",
+    "error": "פרטי התחברות שגויים"
+  },
+  "report": {
+    "generatedOn": "הופק",
+    "confidence": "רמת ביטחון",
+    "verdict": "המלצת Signal",
+    "verdictDesc": "מבוסס על ניתוח יסודי, סנטימנט, סיכון ונתוני שוק.",
+    "entry": "כניסה",
+    "exit": "יציאה",
+    "risk": "סיכון",
+    "executiveSummary": "תקציר מנהלים",
+    "keyMetrics": "מדדים מרכזיים",
+    "sentiment": "סנטימנט שוק",
+    "sentimentBearish": "דובי",
+    "sentimentBullish": "שורי",
+    "riskProfile": "פרופיל סיכון",
+    "riskLow": "סיכון נמוך",
+    "riskHigh": "סיכון גבוה",
+    "swot": "ניתוח SWOT",
+    "strengths": "חוזקות",
+    "weaknesses": "חולשות",
+    "opportunities": "הזדמנויות",
+    "threats": "איומים",
+    "priceTargets": "יעדי מחיר",
+    "entryTarget": "יעד כניסה",
+    "exitTarget": "יעד יציאה",
+    "catalysts": "קטליסטים מרכזיים",
+    "share": "שתף דוח זה",
+    "shareSubtitle": "שלח את ניתוח {{ticker}} לצוות שלך",
+    "email": "אימייל",
+    "whatsapp": "וואטסאפ"
+  },
+  "graham": {
+    "title": "ניתוח ערך בנג'מין גראהם",
+    "subtitle": "7 קריטריונים ליבה + 10 מתקדמים • מספר גראהם • מרווח ביטחון",
+    "loading": "מחשב ניתוח גראהם...",
+    "clickExpand": "לחץ להרחבת הדוח המלא"
+  },
+  "history": {
+    "title": "היסטוריה",
+    "empty": "אין היסטוריה אחרונה",
+    "loaded": "נטען מההיסטוריה"
+  },
+  "howItWorks": {
+    "title": "איך זה עובד",
+    "subtitle": "שלושה צעדים ממניה למחקר ברמה מוסדית",
+    "step1Title": "חפש כל מניה",
+    "step1Desc": "הזן סימול מניה, תעודת סל או סקטור. אנחנו שולפים נתונים בזמן אמת מ-Yahoo Finance, FMP ו-Finnhub.",
+    "step2Title": "ניתוח AI מעמיק",
+    "step2Desc": "מנוע ה-AI שלנו משלב נתוני שוק, חדשות, עסקאות פנים ונתונים פיננסיים ליצירת דוח מחקר מקצועי תוך שניות.",
+    "step3Title": "תובנות מעשיות",
+    "step3Desc": "קבל המלצת BUY/HOLD/SELL, מטריצת SWOT, יעדי מחיר, הערכת שווי גראהם ודוחות מחקר לייצוא."
+  },
+  "footer": {
+    "disclaimer": "הצהרה משפטית",
+    "text": "T&N Signal הוא כלי מחקר מונע בינה מלאכותית. כל המידע מופק על ידי מודלי שפה גדולים וספקי נתוני שוק צד שלישי. אין זו ייעוץ פיננסי. יש להתייעץ תמיד עם יועץ מקצועי לפני הקצאת הון."
+  },
+  "toasts": {
+    "reportComplete": "המחקר הושלם בהצלחה!",
+    "grahamComplete": "ניתוח גראהם הושלם!",
+    "copied": "הועתק ללוח!",
+    "error": "אירעה שגיאה",
+    "rateLimited": "הגבלת קצב — נסה שוב בעוד 30 שניות"
+  },
+  "language": {
+    "en": "EN",
+    "he": "עב"
+  }
+}
