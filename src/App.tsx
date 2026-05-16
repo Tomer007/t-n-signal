@@ -751,7 +751,17 @@ export default function App() {
 
       // ─── Step 8: OPTIONAL — GPT writes ONLY the prose opinion paragraph ───
       try {
-        const opinionPrompt = `You are Benjamin Graham. Based ONLY on the factual summary below, write a 2-3 sentence assessment of this stock in your characteristic voice. Do NOT introduce any new numbers — use only what is given. Output plain prose, no markdown, no headings.
+        const opinionPrompt = `You are writing a brief value-investing assessment in the classic Benjamin Graham tradition — measured, evidence-based, skeptical of speculation, focused on intrinsic value and margin of safety.
+
+Based ONLY on the factual summary below, write 2-3 sentences (maximum 60 words) of plain prose.
+
+RULES:
+- Use ONLY the numbers and facts provided. Do NOT introduce, estimate, or infer any new figure.
+- If the facts contain both favorable and unfavorable signals (e.g. a low price-to-book alongside a high P/E), acknowledge BOTH — do not write a one-sided verdict.
+- Comment only on the value perspective. Do NOT issue your own buy/sell/hold recommendation — the verdict is already stated in the facts; you are interpreting it, not replacing it.
+- Stay measured. No hype, no alarmism, no rhetorical flourishes.
+- If the facts are too sparse to support a judgement, say so plainly rather than padding.
+- Output plain prose only — no markdown, no headings, no bullet points, no quotation marks around the whole response.
 
 FACTS: ${graham.opinionPromptContext}`;
 
