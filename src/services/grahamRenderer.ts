@@ -159,7 +159,10 @@ export function renderGrahamAnalysis(input: GrahamRenderInput): GrahamRenderResu
   const compositePass = compositeEvaluated.filter(r => r.result === 'PASS').length;
   const compositeGrade = gradeScore(compositePass, compositeEvaluated.length);
 
-  // ─── Graham Number ───
+  // Count unknowns for display
+  const coreUnknown = coreResults.filter(r => r.result === 'UNKNOWN').length;
+  const advancedUnknown = advancedResults.filter(r => r.result === 'UNKNOWN').length;
+  const compositeUnknown = coreUnknown + advancedUnknown;
   const eps = metrics.epsTTM?.value ?? null;
   const bvps = metrics.bookValuePerShare;
   const gNumber =
@@ -204,7 +207,7 @@ export function renderGrahamAnalysis(input: GrahamRenderInput): GrahamRenderResu
   md.push('');
   md.push(renderCriteriaTable(coreResults, 1));
   md.push('');
-  md.push(`> **🎯 Core Score: ${coreGrade.passCount} / ${coreGrade.totalCount}** (Grade: ${coreGrade.grade})`);
+  md.push(`> **🎯 Core Score: ${coreGrade.passCount} / 7** ${coreUnknown > 0 ? `(${coreUnknown} criteria unknown) ` : ''}(Grade: ${coreGrade.grade})`);
   md.push('');
   md.push('---');
   md.push('');
@@ -214,7 +217,7 @@ export function renderGrahamAnalysis(input: GrahamRenderInput): GrahamRenderResu
   md.push('');
   md.push(renderCriteriaTable(advancedResults, 1));
   md.push('');
-  md.push(`> **🎯 Advanced Score: ${advancedGrade.passCount} / ${advancedGrade.totalCount}** (Grade: ${advancedGrade.grade})`);
+  md.push(`> **🎯 Advanced Score: ${advancedGrade.passCount} / 10** ${advancedUnknown > 0 ? `(${advancedUnknown} criteria unknown) ` : ''}(Grade: ${advancedGrade.grade})`);
   md.push('');
   md.push('---');
   md.push('');
@@ -256,9 +259,9 @@ export function renderGrahamAnalysis(input: GrahamRenderInput): GrahamRenderResu
   md.push('');
   md.push('| Framework | Score | Grade |');
   md.push('|-----------|-------|-------|');
-  md.push(`| 7 Core Defensive Criteria | ${coreGrade.passCount} / ${coreGrade.totalCount} | ${coreGrade.grade} |`);
-  md.push(`| 10 Advanced Criteria | ${advancedGrade.passCount} / ${advancedGrade.totalCount} | ${advancedGrade.grade} |`);
-  md.push(`| **Composite Graham Score** | **${compositeGrade.passCount} / ${compositeGrade.totalCount}** | **${compositeGrade.grade}** |`);
+  md.push(`| 7 Core Defensive Criteria | ${coreGrade.passCount} / 7 | ${coreGrade.grade} |`);
+  md.push(`| 10 Advanced Criteria | ${advancedGrade.passCount} / 10 | ${advancedGrade.grade} |`);
+  md.push(`| **Composite Graham Score** | **${compositeGrade.passCount} / 17** | **${compositeGrade.grade}** |`);
   md.push('');
 
   // EPS growth — explicitly labeled with the window used (fixes bug #2)

@@ -1,5 +1,6 @@
 import axios from "axios";
 import { AnalysisReport, MarketData, NewsItem } from "../types";
+import { buildShortReportPrompt } from "../prompts/shortReportPrompt";
 
 /** Validates that a parsed object has the required AnalysisReport shape */
 export function validateReport(data: unknown): AnalysisReport {
@@ -114,66 +115,42 @@ export interface ShortReportResult {
 }
 
 export async function generateShortReport(data: MarketData, newsData: NewsItem[], query: string): Promise<ShortReportResult> {
-  // ═══════════════════════════════════════════════════════════════
-  // PASS 1: Generate core thesis + price targets (locked context)
-  // ═══════════════════════════════════════════════════════════════
-  const verifiedData = `<verified_data>
-TICKER: ${query.toUpperCase()}
-CURRENT PRICE: ${data.quote?.regularMarketPrice || 'UNKNOWN'}
-MARKET CAP: ${data.quote?.marketCap || 'UNKNOWN'}
-52-WEEK HIGH: ${data.quote?.fiftyTwoWeekHigh || 'UNKNOWN'}
-52-WEEK LOW: ${data.quote?.fiftyTwoWeekLow || 'UNKNOWN'}
-TRAILING P/E: ${(data.summary as any)?.summaryDetail?.trailingPE || data.quote?.trailingPE || 'UNKNOWN'}
-FORWARD P/E: ${(data.summary as any)?.summaryDetail?.forwardPE || data.quote?.forwardPE || 'UNKNOWN'}
-EPS (TTM): ${data.quote?.epsTrailingTwelveMonths || 'UNKNOWN'}
-DIVIDEND YIELD: ${(data.summary as any)?.summaryDetail?.trailingAnnualDividendYield ? ((data.summary as any).summaryDetail.trailingAnnualDividendYield * 100).toFixed(2) + '%' : 'UNKNOWN'}
-BETA: ${(data.summary as any)?.defaultKeyStatistics?.beta || 'UNKNOWN'}
-BOOK VALUE: ${(data.summary as any)?.defaultKeyStatistics?.bookValue || 'UNKNOWN'}
-DEBT TO EQUITY: ${(data.summary as any)?.financialData?.debtToEquity || 'UNKNOWN'}
-CURRENT RATIO: ${(data.summary as any)?.financialData?.currentRatio || 'UNKNOWN'}
-PROFIT MARGINS: ${(data.summary as any)?.financialData?.profitMargins || 'UNKNOWN'}
-REVENUE GROWTH: ${(data.summary as any)?.financialData?.revenueGrowth || 'UNKNOWN'}
-ANALYST RATING: ${data.quote?.averageAnalystRating || 'UNKNOWN'}
-TARGET MEAN PRICE: ${(data.summary as any)?.financialData?.targetMeanPrice || 'UNKNOWN'}
-TARGET HIGH: ${(data.summary as any)?.financialData?.targetHighPrice || 'UNKNOWN'}
-TARGET LOW: ${(data.summary as any)?.financialData?.targetLowPrice || 'UNKNOWN'}
-</verified_data>
+  // Build the verified data block
+  const fields: Record<string, string> = {
+    'TICKER': query.toUpperCase(),
+    'CURRENT PRICE': String(data.quote?.regularMarketPrice || 'UNKNOWN'),
+    'MARKET CAP': String(data.quote?.marketCap || 'UNKNOWN'),
+    '52-WEEK HIGH': String(data.quote?.fiftyTwoWeekHigh || 'UNKNOWN'),
+    '52-WEEK LOW': String(data.quote?.fiftyTwoWeekLow || 'UNKNOWN'),
+    'TRAILING P/E': String((data.summary as any)?.summaryDetail?.trailingPE || data.quote?.trailingPE || 'UNKNOWN'),
+    'FORWARD P/E': String((data.summary as any)?.summaryDetail?.forwardPE || data.quote?.forwardPE || 'UNKNOWN'),
+    'EPS (TTM)': String(data.quote?.epsTrailingTwelveMonths || 'UNKNOWN'),
+    'DIVIDEND YIELD': (data.summary as any)?.summaryDetail?.trailingAnnualDividendYield ? ((data.summary as any).summaryDetail.trailingAnnualDividendYield * 100).toFixed(2) + '%' : 'UNKNOWN',
+    'BETA': String((data.summary as any)?.defaultKeyStatistics?.beta || 'UNKNOWN'),
+    'BOOK VALUE': String((data.summary as any)?.defaultKeyStatistics?.bookValue || 'UNKNOWN'),
+    'DEBT TO EQUITY': String((data.summary as any)?.financialData?.debtToEquity || 'UNKNOWN'),
+    'CURRENT RATIO': String((data.summary as any)?.financialData?.currentRatio || 'UNKNOWN'),
+    'PROFIT MARGINS': String((data.summary as any)?.financialData?.profitMargins || 'UNKNOWN'),
+    'REVENUE GROWTH': String((data.summary as any)?.financialData?.revenueGrowth || 'UNKNOWN'),
+    'ANALYST RATING': String(data.quote?.averageAnalystRating || 'UNKNOWN'),
+    'TARGET MEAN PRICE': String((data.summary as any)?.financialData?.targetMeanPrice || 'UNKNOWN'),
+    'TARGET HIGH': String((data.summary as any)?.financialData?.targetHighPrice || 'UNKNOWN'),
+    'TARGET LOW': String((data.summary as any)?.financialData?.targetLowPrice || 'UNKNOWN'),
+  };
 
-<recent_news>
-${newsData.slice(0, 8).map(n => `- ${n.title} (${n.publisher})`).join('\n')}
-</recent_news>`;
+  // Compute field completeness for confidence
+  const total = Object.keys(fields).length;
+  const populated = Object.values(fields).filter(v => v !== 'UNKNOWN').length;
 
-  const prompt = `${SYSTEM_PROMPT}
+  const verifiedDataBlock = `<verified_data>\n${Object.entries(fields).map(([k, v]) => `${k}: ${v}`).join('\n')}\n</verified_data>`;
+  const newsBlock = `<recent_news>\n${newsData.slice(0, 8).map(n => `- ${n.title} (${n.publisher})`).join('\n')}\n</recent_news>`;
 
-You are analyzing: ${query}
-
-${verifiedData}
-
-CRITICAL RULES:
-1. You may ONLY cite numbers that appear in <verified_data>. For anything else, write "UNKNOWN — verification required."
-2. Do NOT invent citations like "10-K FY2024, p.42" — you have no access to filings.
-3. The "recommendation" field uses: BUY (bull case dominant), HOLD (balanced), SELL (bear case dominant), WATCH (insufficient data).
-4. Price targets MUST be derived from TARGET MEAN/HIGH/LOW in verified_data. Format as "$X (analyst consensus)" or "$X (Y× forward EPS)". If unavailable, use "UNKNOWN". NEVER invent round numbers without justification.
-5. sentimentScore: 0-100 integer. 0=extreme fear, 50=neutral, 100=extreme greed. Based on news tone + analyst ratings from verified_data.
-6. riskScore: 0-100 integer. 0=treasury-safe, 50=market-average, 100=extreme risk. Based on beta, debt/equity, earnings volatility from verified_data. NOTE: Higher score = MORE risk (bearish direction).
-7. confidence: 0-100 integer. Defined as: "How much verified data supports this conclusion?" 90+=rich data, 50=partial, <30=mostly guessing.
-8. SWOT threats MUST include real, specific bear cases: competitive threats by name, regulatory risks, geopolitical exposure, customer concentration. Do NOT use generic phrases.
-9. Catalysts MUST be specific: name companies, dates, deal sizes where known. Flag rumors explicitly as "[RUMOR]".
-
-Return a structured JSON report with these exact keys:
-{
-  "ticker": "string",
-  "summary": "2-3 sentence thesis based ONLY on verified data",
-  "executiveSummary": { "points": ["string array of 3-5 key findings from verified data"] },
-  "metrics": [{ "label": "string", "value": "string from verified_data", "status": "positive|negative|neutral" }],
-  "swot": { "strengths": ["..."], "weaknesses": ["real specific risks with named competitors/threats"], "opportunities": ["..."], "threats": ["specific named threats — e.g. 'Apple internal modem development', 'China export restrictions'"] },
-  "sentimentScore": 0-100,
-  "riskScore": 0-100,
-  "recommendation": "BUY|HOLD|SELL|WATCH",
-  "confidence": 0-100,
-  "priceTargets": { "entry": "$X (justification: Y× metric)", "exit": "$X (justification: Z× metric)" },
-  "catalysts": ["specific upcoming events with dates/names where known, flag [RUMOR] if unconfirmed"]
-}`;
+  const prompt = buildShortReportPrompt({
+    query,
+    verifiedDataBlock,
+    newsBlock,
+    fieldCompleteness: { populated, total },
+  });
 
   try {
     const res = await axios.post('/api/analyze', { prompt });

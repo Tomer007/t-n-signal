@@ -682,10 +682,11 @@ export default function App() {
       // FMP balance sheet → fill gaps Yahoo missed
       const latestBalance = fmpData.balance?.[0];
       if (latestBalance) {
-        verified.total_debt = verified.total_debt ?? latestBalance.totalDebt ?? null;
-        verified.current_assets = verified.current_assets ?? latestBalance.totalCurrentAssets ?? null;
-        verified.current_liabilities = verified.current_liabilities ?? latestBalance.totalCurrentLiabilities ?? null;
-        verified.book_value_per_share = verified.book_value_per_share ?? latestBalance.tangibleBookValuePerShare ?? null;
+        if (verified.total_debt === null && latestBalance.totalDebt != null) verified.total_debt = latestBalance.totalDebt;
+        if (verified.current_assets === null && latestBalance.totalCurrentAssets != null) verified.current_assets = latestBalance.totalCurrentAssets;
+        if (verified.current_liabilities === null && latestBalance.totalCurrentLiabilities != null) verified.current_liabilities = latestBalance.totalCurrentLiabilities;
+        if (verified.book_value_per_share === null && latestBalance.tangibleBookValuePerShare != null) verified.book_value_per_share = latestBalance.tangibleBookValuePerShare;
+        if (verified.shares_outstanding === null && latestBalance.commonStockSharesOutstanding != null) verified.shares_outstanding = latestBalance.commonStockSharesOutstanding;
       }
 
       const metrics = buildCanonicalMetrics(verified);
@@ -697,7 +698,10 @@ export default function App() {
       }
 
       // ─── Step 5: Sector + framework applicability ───
-      const sector: string = fmpData.profile?.sector || 'Unknown';
+      const sector: string = fmpData.profile?.sector
+        || (summary as any)?.assetProfile?.sector
+        || (summary as any)?.summaryProfile?.sector
+        || 'Unknown';
       const applicability = getGrahamApplicability(sector);
 
       // 5-year highest P/E from ratios

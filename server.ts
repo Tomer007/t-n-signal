@@ -356,7 +356,7 @@ async function startServer() {
       });
 
       const summary = await withRetry(() => (yahooFinance.quoteSummary(ticker, {
-        modules: ['summaryDetail', 'defaultKeyStatistics', 'financialData', 'price']
+        modules: ['summaryDetail', 'defaultKeyStatistics', 'financialData', 'price', 'assetProfile']
       }) as any)).catch((e: any) => {
         console.warn(`Summary failed for ${ticker}:`, e.message?.slice(0, 100));
         return null;
@@ -486,9 +486,9 @@ async function startServer() {
     try {
       const baseUrl = 'https://financialmodelingprep.com/api/v3';
       const [incomeRes, balanceRes, ratiosRes, profileRes, cashFlowRes] = await Promise.all([
-        axios.get(`${baseUrl}/income-statement/${ticker}?period=annual&limit=5&apikey=${FMP_API_KEY}`).catch(() => ({ data: [] })),
+        axios.get(`${baseUrl}/income-statement/${ticker}?period=annual&limit=10&apikey=${FMP_API_KEY}`).catch(() => ({ data: [] })),
         axios.get(`${baseUrl}/balance-sheet-statement/${ticker}?period=annual&limit=5&apikey=${FMP_API_KEY}`).catch(() => ({ data: [] })),
-        axios.get(`${baseUrl}/ratios/${ticker}?period=annual&limit=5&apikey=${FMP_API_KEY}`).catch(() => ({ data: [] })),
+        axios.get(`${baseUrl}/ratios/${ticker}?period=annual&limit=10&apikey=${FMP_API_KEY}`).catch(() => ({ data: [] })),
         axios.get(`${baseUrl}/profile/${ticker}?apikey=${FMP_API_KEY}`).catch(() => ({ data: [] })),
         axios.get(`${baseUrl}/cash-flow-statement/${ticker}?period=annual&limit=5&apikey=${FMP_API_KEY}`).catch(() => ({ data: [] })),
       ]);
