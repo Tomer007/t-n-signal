@@ -659,20 +659,28 @@ export default function App() {
 
       // Enrich verified data with FMP + EDGAR history
       const epsHistory10y: { year: string; eps: number }[] = [];
+      
+      // Try EDGAR first (best source for 10-year history)
       if (Array.isArray(edgarData.eps) && edgarData.eps.length > 0) {
         for (const d of edgarData.eps) {
           if (d.year && typeof d.value === 'number') {
             epsHistory10y.push({ year: String(d.year), eps: d.value });
           }
         }
-      } else if (Array.isArray(fmpData.income) && fmpData.income.length > 0) {
+      }
+      
+      // If EDGAR returned fewer than 5 years, supplement with FMP income statements
+      if (epsHistory10y.length < 5 && Array.isArray(fmpData.income) && fmpData.income.length > 0) {
+        const existingYears = new Set(epsHistory10y.map(e => e.year));
         for (const s of fmpData.income) {
           const yr = s.calendarYear || s.date?.slice(0, 4);
-          if (yr && typeof s.eps === 'number') {
+          if (yr && typeof s.eps === 'number' && !existingYears.has(String(yr))) {
             epsHistory10y.push({ year: String(yr), eps: s.eps });
+            existingYears.add(String(yr));
           }
         }
       }
+      
       epsHistory10y.sort((a, b) => parseInt(a.year) - parseInt(b.year));
       if (epsHistory10y.length > 0) {
         verified.eps_history_10y = epsHistory10y;
