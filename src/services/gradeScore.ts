@@ -11,7 +11,7 @@
 // Types
 // ═══════════════════════════════════════════════════════════════
 
-export type GrahamGrade = 'A+' | 'A' | 'B+' | 'B' | 'C' | 'D' | 'F';
+export type GrahamGrade = 'A' | 'B' | 'C' | 'D' | 'F';
 
 export interface GradeResult {
   grade: GrahamGrade;
@@ -30,21 +30,17 @@ export interface GradeResult {
  *
  * passRate = passCount / totalCount (ignoring UNKNOWN criteria)
  *
- * A+: 100% (all criteria pass)
- * A:  >= 85%
- * B+: >= 70%
- * B:  >= 55%
- * C:  >= 40%
- * D:  >= 25%
- * F:  < 25%
+ * A:  >= 90%
+ * B:  >= 75%
+ * C:  >= 60%
+ * D:  >= 45%
+ * F:  < 45%
  */
 const GRADE_THRESHOLDS: Array<{ minRate: number; grade: GrahamGrade; label: string }> = [
-  { minRate: 1.00, grade: 'A+', label: 'Exceptional Value' },
-  { minRate: 0.85, grade: 'A', label: 'Strong Value' },
-  { minRate: 0.70, grade: 'B+', label: 'Good Value' },
-  { minRate: 0.55, grade: 'B', label: 'Fair Value' },
-  { minRate: 0.40, grade: 'C', label: 'Below Average' },
-  { minRate: 0.25, grade: 'D', label: 'Poor Value' },
+  { minRate: 0.90, grade: 'A', label: 'Strong Value' },
+  { minRate: 0.75, grade: 'B', label: 'Good Value' },
+  { minRate: 0.60, grade: 'C', label: 'Fair Value' },
+  { minRate: 0.45, grade: 'D', label: 'Below Average' },
   { minRate: 0.00, grade: 'F', label: 'Fails Graham Criteria' },
 ];
 
@@ -116,13 +112,11 @@ export function gradeFromResults(results: Array<{ result: 'PASS' | 'FAIL' | 'UNK
  */
 export function verdictFromGrade(grade: GrahamGrade): 'BUY' | 'HOLD' | 'AVOID' {
   switch (grade) {
-    case 'A+':
     case 'A':
       return 'BUY';
-    case 'B+':
     case 'B':
-      return 'HOLD';
     case 'C':
+      return 'HOLD';
     case 'D':
     case 'F':
       return 'AVOID';
