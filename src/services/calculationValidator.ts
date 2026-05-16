@@ -188,7 +188,7 @@ export function evaluateCoreDefensive(data: GrahamInputData): GrahamCriterionOut
     results.push({
       criterion: 'Debt ÷ Current Assets',
       threshold: '< 1.10×',
-      actual: `${ratio.toFixed(3)}×`,
+      actual: `${ratio.toFixed(2)}×`,
       result: ratio < 1.10 ? 'PASS' : 'FAIL',
       unitValidation: 'valid',
     });

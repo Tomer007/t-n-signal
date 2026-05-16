@@ -44,6 +44,11 @@ import { Toaster, toast } from 'sonner';
 
 import { generateShortReport, generateLongFormReport } from './lib/ai';
 import { AnalysisReport, MarketData } from './types';
+import { MarketDataService } from './services/market_data';
+import { buildCanonicalMetrics } from './services/canonicalMetrics';
+import { renderGrahamAnalysis } from './services/grahamRenderer';
+import { generateReconciliation } from './services/reconciliation';
+import { getGrahamApplicability } from './services/frameworkApplicability';
 
 /** Safely converts a value to a displayable number */
 function safeNum(val: any, fallback: number = 0): number {
@@ -603,239 +608,175 @@ export default function App() {
     toast.success('Markdown downloaded! You can now upload this to NotebookLM.');
   };
 
-  const runGrahamAnalysis = async (overrideReport?: AnalysisReport, overrideMarketData?: MarketData | null) => {
+
+  const runGrahamAnalysis = async (
+    overrideReport?: AnalysisReport,
+    overrideMarketData?: MarketData | null
+  ) => {
     const report = overrideReport || currentReport;
     if (!report?.ticker) return;
     setGrahamLoading(true);
     setGrahamContent('');
+
     const ticker = report.ticker;
-    const quote = (overrideMarketData || marketData)?.quote;
-    const summary = (overrideMarketData || marketData)?.summary;
+    const md = overrideMarketData || marketData;
+    const quote = md?.quote;
+    const summary = md?.summary;
 
-    // Fetch FMP fundamentals for deeper Graham data
-    let fmpData = { income: [], balance: [], ratios: [], profile: null } as any;
     try {
-      const fmpRes = await axios.post('/api/fundamentals', { ticker });
-      fmpData = fmpRes.data;
-    } catch {}
-
-    // Fetch SEC EDGAR data (10-year EPS/Revenue history)
-    let edgarData = { eps: [], revenue: [], netIncome: [] } as any;
-    try {
-      const edgarRes = await axios.post('/api/edgar', { ticker });
-      edgarData = edgarRes.data;
-    } catch {}
-
-    // Build EPS history — prefer EDGAR (10yr), fallback to FMP
-    let epsHistory = 'NOT AVAILABLE';
-    if (edgarData.eps?.length > 0) {
-      epsHistory = edgarData.eps.map((d: any) => `${d.year}: EPS $${d.value?.toFixed(2)}`).join('\n');
-      if (edgarData.revenue?.length > 0) {
-        epsHistory += '\n\nRevenue History:\n' + edgarData.revenue.map((d: any) => `${d.year}: $${(d.value / 1e9).toFixed(2)}B`).join('\n');
+      // ─── Step 1: Fetch fundamentals (FMP) for EPS history, FCF, sector ───
+      let fmpData: any = { income: [], balance: [], ratios: [], profile: null, cashFlow: [] };
+      try {
+        const fmpRes = await axios.post('/api/fundamentals', { ticker });
+        fmpData = fmpRes.data;
+      } catch {
+        addApiLog('FMP', 'error', `Fundamentals unavailable for ${ticker}`);
       }
-    } else if (fmpData.income?.length > 0) {
-      epsHistory = fmpData.income.slice(0, 10).map((y: any) => `${y.calendarYear || y.date?.slice(0,4)}: EPS $${y.eps?.toFixed(2) || 'N/A'}, Revenue $${(y.revenue/1e6)?.toFixed(1)}M`).join('\n');
-    }
-    
-    // Build balance sheet data
-    const latestBalance = fmpData.balance?.[0];
-    const balanceData = latestBalance ? `Current Assets: $${(latestBalance.totalCurrentAssets/1e6)?.toFixed(1)}M, Total Liabilities: $${(latestBalance.totalLiabilities/1e6)?.toFixed(1)}M, Net Current Assets: $${((latestBalance.totalCurrentAssets - latestBalance.totalLiabilities)/1e6)?.toFixed(1)}M, Tangible Book/Share: $${latestBalance.tangibleBookValuePerShare?.toFixed(2) || 'N/A'}` : 'NOT AVAILABLE';
 
-    // Build ratios
-    const latestRatios = fmpData.ratios?.[0];
-    const ratiosData = latestRatios ? `P/E: ${latestRatios.priceEarningsRatio?.toFixed(2) || 'N/A'}, P/B: ${latestRatios.priceToBookRatio?.toFixed(2) || 'N/A'}, Dividend Yield: ${(latestRatios.dividendYield * 100)?.toFixed(2) || '0'}%, Current Ratio: ${latestRatios.currentRatio?.toFixed(2) || 'N/A'}` : 'NOT AVAILABLE';
+      // ─── Step 2: Fetch SEC EDGAR for 10-year EPS history ───
+      let edgarData: any = { eps: [], revenue: [], netIncome: [] };
+      try {
+        const edgarRes = await axios.post('/api/edgar', { ticker });
+        edgarData = edgarRes.data;
+      } catch {
+        // non-fatal — EDGAR is best-effort
+      }
 
-    const grahamPrompt = `You are a value investing analyst applying Benjamin Graham's framework from "The Intelligent Investor" and "Security Analysis." Analyze the following stock against Graham's complete defensive investor criteria and provide a verdict using the EXACT output format specified below.
+      // ─── Step 3: Fetch AAA bond yield (FRED) for the Graham benchmark ───
+      let aaaYield = 0.05; // documented fallback
+      try {
+        const aaaRes = await axios.get('/api/aaa-yield');
+        if (typeof aaaRes.data?.yield === 'number') {
+          aaaYield = aaaRes.data.yield / 100; // FRED returns percent
+        }
+      } catch {
+        // fallback 5% stands
+      }
 
-**STOCK TO ANALYZE:** ${ticker}
+      // ─── Step 4: Build VerifiedTickerData, then CanonicalMetrics ───
+      const service = new MarketDataService();
+      const verified = service.extractFromYahoo(ticker, quote, summary);
 
----
-
-## AVAILABLE MARKET DATA (use this — do NOT say you cannot fetch data):
-${JSON.stringify(quote, null, 2)}
-
-## FINANCIAL SUMMARY:
-${JSON.stringify(summary, null, 2)}
-
-## HISTORICAL INCOME STATEMENTS (up to 10 years):
-${epsHistory}
-
-## BALANCE SHEET DATA:
-${balanceData}
-
-## KEY RATIOS:
-${ratiosData}
-
----
-
-## INSTRUCTIONS
-1. Use ALL the market data provided above. Do NOT refuse or say you cannot access data — it is provided.
-2. Use AAA corporate bond yield of approximately 5.0% as benchmark (or state if different).
-3. Show calculations explicitly where required.
-4. Follow the OUTPUT FORMAT below exactly — do not deviate from the structure.
-5. Use ✅ for PASS, ❌ for FAIL, ⚠️ for PARTIAL/UNKNOWN.
-6. If a specific data point is not available in ANY of the provided data blocks, mark it as ⚠️ UNKNOWN.
-7. Calculate 5-year and 10-year EPS growth from the HISTORICAL INCOME STATEMENTS if available.
-8. Calculate Net Current Asset Value from BALANCE SHEET DATA if available.
-9. IMPORTANT — Framework Limitation Note: If the company is asset-light (tech, IP-heavy, SaaS), add a note in the FINAL VERDICT: "⚠️ Graham's framework was designed for industrial/asset-heavy companies. For IP-heavy businesses, Price-to-Book and Net Current Asset Value criteria are structurally unfavorable and should be weighted less heavily."
-10. If the Graham screen says AVOID but fundamentals are strong (high ROE, growing EPS, strong moat), reconcile: "Quantitative Graham screen: AVOID. Qualitative assessment: [your view]. Reconciliation: [explain why they differ]."
-
----
-
-## REQUIRED OUTPUT FORMAT
-
-# 📊 Benjamin Graham Analysis: [COMPANY NAME] ([TICKER])
-
-## 🏢 Company Snapshot
-| Field | Value |
-|-------|-------|
-| Company Name | ? |
-| Ticker | ? |
-| Sector / Industry | ? |
-| Current Price | $? |
-| Market Cap | $? |
-| Currency | ? |
-| Data As Of | YYYY-MM-DD |
-| AAA Bond Yield (Benchmark) | ?% |
-
----
-
-## 📋 FRAMEWORK 1 — The 7 Core Defensive Criteria
-
-| # | Criterion | Graham's Threshold | Actual Value | Result |
-|---|-----------|-------------------|--------------|--------|
-| 1 | S&P Quality Rating | B+ or better | ? | ✅/❌/⚠️ |
-| 2 | Debt ÷ Current Assets | < 1.10× | ? | ✅/❌/⚠️ |
-| 3 | Current Ratio | ≥ 1.5 (ideal 2.0+) | ? | ✅/❌/⚠️ |
-| 4 | 5-Yr EPS Growth (no deficits) | Positive | ? | ✅/❌/⚠️ |
-| 5 | P/E Ratio | ≤ 9 (max 15) | ? | ✅/❌/⚠️ |
-| 6 | Price-to-Book | ≤ 1.2× | ? | ✅/❌/⚠️ |
-| 7 | Pays Dividend | Yes | ? | ✅/❌/⚠️ |
-
-> **🎯 Core Score: X / 7**
-
----
-
-## 🔬 FRAMEWORK 2 — The 10 Advanced Criteria
-
-### 💰 Reward Criteria (Is it cheap?)
-
-| # | Criterion | Threshold | Actual | Result |
-|---|-----------|-----------|--------|--------|
-| 1 | Earnings Yield ≥ 2× AAA Yield | ≥ ?% | ?% | ✅/❌/⚠️ |
-| 2 | P/E ≤ 40% of 5-Yr Highest P/E | ≤ ? | ? | ✅/❌/⚠️ |
-| 3 | Dividend Yield ≥ ⅔ AAA Yield | ≥ ?% | ?% | ✅/❌/⚠️ |
-| 4 | Price ≤ ⅔ Tangible Book/Share | ≤ $? | $? | ✅/❌/⚠️ |
-| 5 | Price ≤ ⅔ Net Current Asset Value | ≤ $? | $? | ✅/❌/⚠️ |
-
-### 🛡️ Risk Criteria (Is it safe?)
-
-| # | Criterion | Threshold | Actual | Result |
-|---|-----------|-----------|--------|--------|
-| 6 | Total Debt < Tangible Book Value | Yes | ? | ✅/❌/⚠️ |
-| 7 | Current Ratio ≥ 2.0 | ≥ 2.0 | ? | ✅/❌/⚠️ |
-| 8 | Total Debt ≤ 2× Net Quick Liquidation | ≤ 2× | ? | ✅/❌/⚠️ |
-| 9 | 10-Yr EPS Growth ≥ 7% CAGR | ≥ 7% | ?% | ✅/❌/⚠️ |
-| 10 | ≤ 2 EPS Declines of 5%+ in 10 Yrs | ≤ 2 | ? | ✅/❌/⚠️ |
-
-> **🎯 Advanced Score: X / 10** (Reward: X/5 | Risk: X/5)
-
----
-
-## 🧮 FRAMEWORK 3 — Graham Number & Margin of Safety
-
-### Calculation
-Graham Number = √(22.5 × EPS × Book Value Per Share)
-
-### Valuation Summary
-| Metric | Value |
-|--------|-------|
-| EPS (TTM) | $? |
-| Book Value Per Share | $? |
-| **Graham Number (Fair Value Ceiling)** | **$?** |
-| Current Price | $? |
-| Discount / (Premium) to Graham Number | ?% |
-| Suggested Buy Price (33% MoS) | $? |
-
-### Margin of Safety Zone
-| Zone | Price Range | Status |
-|------|-------------|--------|
-| 🟢 BUY (≥33% MoS) | ≤ $? | ? |
-| 🟡 WATCH | $? – $? | ? |
-| 🔴 AVOID | > $? | ? |
-
----
-
-## 🏆 FINAL VERDICT
-
-### Overall Rating
-> **⭐ [STRONG BUY / BUY / HOLD / AVOID]**
-
-### Scorecard Summary
-| Framework | Score | Grade |
-|-----------|-------|-------|
-| 7 Core Defensive Criteria | X / 7 | A/B/C/D/F |
-| 10 Advanced Criteria | X / 10 | A/B/C/D/F |
-| Margin of Safety (Graham Number) | ?% | A/B/C/D/F |
-| **Composite Graham Score** | **X / 17** | **?** |
-
-### ✅ Top 3 Strengths
-1. ?
-2. ?
-3. ?
-
-### ❌ Top 3 Weaknesses
-1. ?
-2. ?
-3. ?
-
-### 💵 Price Targets
-| Target | Price |
-|--------|-------|
-| Intrinsic Value (Graham Number) | $? |
-| Suggested Entry (33% MoS) | $? |
-| Current Price | $? |
-| Upside / (Downside) to Fair Value | ?% |
-
-### 🎓 Graham's Likely Opinion
-> *"[2–3 sentence assessment in the spirit of Benjamin Graham.]"*
-
----
-*Analysis based on Benjamin Graham's "The Intelligent Investor" (Revised Edition).*`;
-
-    try {
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: grahamPrompt, stream: true, model: 'gpt-4o-mini' })
-      });
-
-      if (!response.ok) throw new Error(`Server returned ${response.status}`);
-      if (!response.body) throw new Error('No stream');
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let content = '';
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.replace('data: ', '').trim();
-            if (dataStr === '[DONE]') break;
-            try {
-              const dataObj = JSON.parse(dataStr);
-              content += dataObj.content;
-              setGrahamContent(content);
-            } catch {}
+      // Enrich verified data with FMP + EDGAR history
+      const epsHistory10y: { year: string; eps: number }[] = [];
+      if (Array.isArray(edgarData.eps) && edgarData.eps.length > 0) {
+        for (const d of edgarData.eps) {
+          if (d.year && typeof d.value === 'number') {
+            epsHistory10y.push({ year: String(d.year), eps: d.value });
+          }
+        }
+      } else if (Array.isArray(fmpData.income) && fmpData.income.length > 0) {
+        for (const s of fmpData.income) {
+          const yr = s.calendarYear || s.date?.slice(0, 4);
+          if (yr && typeof s.eps === 'number') {
+            epsHistory10y.push({ year: String(yr), eps: s.eps });
           }
         }
       }
+      epsHistory10y.sort((a, b) => parseInt(a.year) - parseInt(b.year));
+      if (epsHistory10y.length > 0) {
+        verified.eps_history_10y = epsHistory10y;
+        verified.eps_history_5y = epsHistory10y.slice(-5);
+      }
+
+      // FMP balance sheet → fill gaps Yahoo missed
+      const latestBalance = fmpData.balance?.[0];
+      if (latestBalance) {
+        verified.total_debt = verified.total_debt ?? latestBalance.totalDebt ?? null;
+        verified.current_assets = verified.current_assets ?? latestBalance.totalCurrentAssets ?? null;
+        verified.current_liabilities = verified.current_liabilities ?? latestBalance.totalCurrentLiabilities ?? null;
+        verified.book_value_per_share = verified.book_value_per_share ?? latestBalance.tangibleBookValuePerShare ?? null;
+      }
+
+      const metrics = buildCanonicalMetrics(verified);
+
+      // Free cash flow from FMP cash-flow statement (fixes bug #5)
+      const latestCashFlow = fmpData.cashFlow?.[0];
+      if (latestCashFlow && typeof latestCashFlow.freeCashFlow === 'number') {
+        metrics.freeCashFlowTTM = latestCashFlow.freeCashFlow;
+      }
+
+      // ─── Step 5: Sector + framework applicability ───
+      const sector: string = fmpData.profile?.sector || 'Unknown';
+      const applicability = getGrahamApplicability(sector);
+
+      // 5-year highest P/E from ratios
+      let peHighest5y: number | null = null;
+      if (Array.isArray(fmpData.ratios) && fmpData.ratios.length > 0) {
+        const pes = fmpData.ratios
+          .map((r: any) => r.priceEarningsRatio)
+          .filter((v: any) => typeof v === 'number' && v > 0);
+        if (pes.length > 0) peHighest5y = Math.max(...pes);
+      }
+
+      // ─── Step 6: RENDER the Graham analysis DETERMINISTICALLY ───
+      const graham = renderGrahamAnalysis({
+        ticker,
+        companyName: (quote as any)?.shortName || (quote as any)?.longName || ticker,
+        sector,
+        metrics,
+        aaaBondYield: aaaYield,
+        epsHistory10y: verified.eps_history_10y,
+        peHighest5y,
+        netCurrentAssetValuePerShare:
+          latestBalance && metrics.sharesOutstanding
+            ? ((latestBalance.totalCurrentAssets || 0) - (latestBalance.totalLiabilities || 0)) /
+              metrics.sharesOutstanding
+            : null,
+      });
+
+      let finalMarkdown = graham.markdown;
+
+      // ─── Step 7: Reconciliation (fixes bug #1) ───
+      const mainVerdict = report.recommendation === 'WATCH' ? 'HOLD' : report.recommendation;
+      const reconciliation = generateReconciliation({
+        mainVerdict: mainVerdict as 'BUY' | 'HOLD' | 'SELL' | 'AVOID',
+        grahamVerdict: graham.verdict,
+        grahamPassCount: graham.passCount,
+        grahamTotalCount: graham.totalCount,
+        metrics,
+        applicability,
+        sector,
+      });
+
+      if (reconciliation.needed && reconciliation.section) {
+        finalMarkdown = `${reconciliation.section}\n\n---\n\n${finalMarkdown}`;
+      }
+
+      setGrahamContent(finalMarkdown);
+
+      // ─── Step 8: OPTIONAL — GPT writes ONLY the prose opinion paragraph ───
+      try {
+        const opinionPrompt = `You are Benjamin Graham. Based ONLY on the factual summary below, write a 2-3 sentence assessment of this stock in your characteristic voice. Do NOT introduce any new numbers — use only what is given. Output plain prose, no markdown, no headings.
+
+FACTS: ${graham.opinionPromptContext}`;
+
+        const opinionRes = await axios.post('/api/analyze', {
+          prompt: opinionPrompt,
+          model: 'gpt-4o-mini',
+        });
+        const rawOpinion = opinionRes.data?.result;
+        let opinion = rawOpinion;
+        if (typeof rawOpinion === 'string') {
+          try {
+            const parsed = JSON.parse(rawOpinion);
+            opinion = parsed.opinion || parsed.text || parsed.content || rawOpinion;
+          } catch {
+            opinion = rawOpinion;
+          }
+        }
+        if (opinion && typeof opinion === 'string' && opinion.trim().length > 0) {
+          finalMarkdown += `\n\n### 🎓 Graham's Likely Opinion\n> *"${opinion.trim()}"*`;
+          setGrahamContent(finalMarkdown);
+        }
+      } catch {
+        // Opinion is decorative — the deterministic report stands on its own.
+      }
+
+      addApiLog('Graham', 'ok', `Computed: ${graham.verdict} (${graham.passCount}/${graham.totalCount})`);
       toast.success('Graham Analysis complete!');
     } catch (err: any) {
+      addApiLog('Graham', 'error', err.message || 'Graham analysis failed');
       toast.error(err.message || 'Graham analysis failed');
     } finally {
       setGrahamLoading(false);

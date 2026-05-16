@@ -485,11 +485,12 @@ async function startServer() {
 
     try {
       const baseUrl = 'https://financialmodelingprep.com/api/v3';
-      const [incomeRes, balanceRes, ratiosRes, profileRes] = await Promise.all([
+      const [incomeRes, balanceRes, ratiosRes, profileRes, cashFlowRes] = await Promise.all([
         axios.get(`${baseUrl}/income-statement/${ticker}?period=annual&limit=5&apikey=${FMP_API_KEY}`).catch(() => ({ data: [] })),
         axios.get(`${baseUrl}/balance-sheet-statement/${ticker}?period=annual&limit=5&apikey=${FMP_API_KEY}`).catch(() => ({ data: [] })),
         axios.get(`${baseUrl}/ratios/${ticker}?period=annual&limit=5&apikey=${FMP_API_KEY}`).catch(() => ({ data: [] })),
         axios.get(`${baseUrl}/profile/${ticker}?apikey=${FMP_API_KEY}`).catch(() => ({ data: [] })),
+        axios.get(`${baseUrl}/cash-flow-statement/${ticker}?period=annual&limit=5&apikey=${FMP_API_KEY}`).catch(() => ({ data: [] })),
       ]);
 
       res.json({
@@ -497,6 +498,7 @@ async function startServer() {
         balance: balanceRes.data,
         ratios: ratiosRes.data,
         profile: profileRes.data?.[0] || null,
+        cashFlow: cashFlowRes.data,
       });
     } catch (error: any) {
       console.error('FMP Error:', error.message);
