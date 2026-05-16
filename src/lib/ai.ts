@@ -71,9 +71,7 @@ TIME HORIZON: 12-month and 36-month price targets, with 5-year financial project
    - Use the exact section numbering and headings below. Do not reorganize.
 
 3. INTELLECTUAL HONESTY:
-   - Every BUY/HOLD/SELL must be paired with a "Steel-man of the opposing view" subsection.
    - Every forecast must declare its key assumptions explicitly and flag which 2–3 assumptions matter most (sensitivity ranking).
-   - Include a mandatory "What Would Change My View" section listing 3–5 specific, observable events that would invalidate the thesis.
 
 4. SOURCE QUALITY TIERS (use highest available):
    - Tier 1: Company filings (10-K, 10-Q, 8-K, 20-F, annual report, investor day decks)
@@ -103,9 +101,7 @@ TIME HORIZON: 3–5 years forward, with explicit 12-month and 36-month price tar
    - Each scoring exercise must use the rubrics defined here, not ad-hoc scales.
 
 3. INTELLECTUAL HONESTY:
-   - Every BUY/HOLD/SELL must be paired with a "Steel-man of the opposing view" subsection.
    - Every forecast must declare its key assumptions explicitly and flag which 2–3 assumptions matter most (sensitivity ranking).
-   - Include a mandatory "What Would Change My View" section listing 3–5 specific, observable events that would invalidate the thesis.
 
 4. SOURCE QUALITY TIERS (use highest available):
    - Tier 1: Company filings
@@ -227,6 +223,20 @@ export async function* generateLongFormReport(data: MarketData, newsData: NewsIt
     };
   }
 
+  // ─── Verdict sanity gate: cap BUY at HOLD when data contradicts ───
+  // If analyst rating is Hold or worse (≥2.5 on 1-5 scale) AND fundamentals
+  // are weak (P/E > 50 or EPS TTM ≤ 0), a BUY verdict is indefensible.
+  if (thesis.verdict === 'BUY') {
+    const analystScore = (data.summary as any)?.financialData?.recommendationMean;
+    const peTrailing = metrics.peTrailing;
+    const epsTtm = metrics.epsTTM?.value ?? null;
+    const analystIsHoldOrWorse = typeof analystScore === 'number' && analystScore >= 2.5;
+    const fundamentalsWeak = (peTrailing !== null && peTrailing > 50) || (epsTtm !== null && epsTtm <= 0.5);
+    if (analystIsHoldOrWorse && fundamentalsWeak) {
+      thesis = { ...thesis, verdict: 'HOLD' as const, confidenceReasoning: thesis.confidenceReasoning + ' (Capped from BUY to HOLD: analyst consensus is Hold or worse with weak fundamentals.)' };
+    }
+  }
+
   // ─── Pre-formatted metrics block (NOT raw JSON) ───
   const metricsBlock = [
     `Current Price: ${formatCurrency(metrics.price)}`,
@@ -305,7 +315,7 @@ export async function* generateLongFormReport(data: MarketData, newsData: NewsIt
         }
       }
 
-      fullReport += `\n\n${sectionContent}\n\n---`;
+      fullReport += `\n\n${sectionContent.replace(/^```(?:markdown)?\n?/gm, '').replace(/```$/gm, '').replace(/^SECTION \d+ — /gm, '')}\n\n---`;
       yield { step: `Completed ${sectionTitle}`, progress: 10 + ((i + 1) / sections.length) * 85, content: fullReport, prompt: finalPromptHeader };
     } catch (err) {
       console.error("Stream Error:", err);
