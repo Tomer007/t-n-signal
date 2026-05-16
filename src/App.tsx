@@ -1649,40 +1649,6 @@ FACTS: ${graham.opinionPromptContext}`;
             </Card>
             )}
 
-            {/* Used Prompt — Collapsed by default */}
-            {activePrompt && (
-              <Card className="bg-zinc-950 border-zinc-900">
-                <CardHeader 
-                  className="flex flex-row items-center justify-between p-6 cursor-pointer hover:bg-zinc-900/30 transition-colors rounded-t-xl"
-                  onClick={() => {
-                    const el = document.getElementById('prompt-content');
-                    if (el) el.classList.toggle('hidden');
-                  }}
-                >
-                  <CardTitle className="text-sm font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
-                    <span className="text-zinc-600">▶</span> Used Prompt
-                  </CardTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigator.clipboard.writeText(activePrompt);
-                      toast.success('Prompt copied to clipboard!');
-                    }}
-                    className="border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white text-xs"
-                  >
-                    📋 Copy
-                  </Button>
-                </CardHeader>
-                <CardContent id="prompt-content" className="p-6 pt-0 hidden">
-                  <pre className="text-xs text-zinc-500 font-mono whitespace-pre-wrap leading-relaxed max-h-[300px] overflow-y-auto bg-black/30 p-4 rounded-lg border border-zinc-900 select-all">
-                    {activePrompt}
-                  </pre>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Long Form Preview */}
             {isLongForm && longFormContent && (
                <motion.div
