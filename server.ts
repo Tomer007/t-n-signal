@@ -653,9 +653,9 @@ async function startServer() {
       res.json({
         ticker,
         cik,
-        eps: annualEps.map((d: any) => ({ year: d.end?.slice(0, 4), value: d.val })),
-        revenue: annualRevenue.map((d: any) => ({ year: d.end?.slice(0, 4), value: d.val })),
-        netIncome: annualNetIncome.map((d: any) => ({ year: d.end?.slice(0, 4), value: d.val })),
+        eps: [...new Map(annualEps.map((d: any) => [d.end?.slice(0, 4), { year: d.end?.slice(0, 4), value: d.val }])).values()],
+        revenue: [...new Map(annualRevenue.map((d: any) => [d.end?.slice(0, 4), { year: d.end?.slice(0, 4), value: d.val }])).values()],
+        netIncome: [...new Map(annualNetIncome.map((d: any) => [d.end?.slice(0, 4), { year: d.end?.slice(0, 4), value: d.val }])).values()],
       });
     } catch (error: any) {
       console.error('EDGAR Error:', error.message);
