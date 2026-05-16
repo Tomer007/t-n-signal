@@ -52,6 +52,15 @@ function safeNum(val: any, fallback: number = 0): number {
   return fallback;
 }
 
+/** Derives sentiment label from score (0=bearish, 100=bullish) */
+export function getSentimentLabel(score: number): string {
+  if (score < 30) return 'Bearish';
+  if (score < 45) return 'Mildly Bearish';
+  if (score < 55) return 'Neutral';
+  if (score < 70) return 'Mildly Bullish';
+  return 'Bullish';
+}
+
 /** Formats Graham analysis markdown into styled HTML */
 function formatGrahamMarkdown(md: string, isDark: boolean = true): string {
   const textColor = isDark ? '#d4d4d8' : '#27272a';
@@ -1437,8 +1446,9 @@ Graham Number = √(22.5 × EPS × Book Value Per Share)
                         <Radar name="Score" dataKey="A" stroke="#1D9E75" fill="#1D9E75" fillOpacity={0.3} />
                       </RadarChart>
                     </ResponsiveContainer>
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                        <span className="text-2xl font-black text-white">{safeNum(currentReport.sentimentScore)}%</span>
+                       <span className="text-[8px] text-zinc-400 uppercase font-bold">{getSentimentLabel(safeNum(currentReport.sentimentScore))}</span>
                     </div>
                   </div>
                 </CardContent>
