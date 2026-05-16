@@ -233,10 +233,13 @@ async function startServer() {
         trackCost('openai', model, Math.ceil(prompt.length / 4), Math.ceil(outputChars / 4));
         res.end();
       } else {
+        // Only use json_object response format if the prompt mentions "json"
+        // (OpenAI requires the word "json" in the message to use this format)
+        const wantsJson = prompt.toLowerCase().includes('json');
         const completion = await openai.chat.completions.create({
           model,
           messages: [{ role: 'user', content: prompt }],
-          response_format: { type: 'json_object' }
+          ...(wantsJson ? { response_format: { type: 'json_object' as const } } : {}),
         });
         // Track cost
         const usage = completion.usage;
